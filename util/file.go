@@ -1,7 +1,6 @@
 package util
 
 import (
-	"MusicConvert/config"
 	"MusicConvert/model"
 	"log"
 	"os"
@@ -19,7 +18,7 @@ func visit(files *[]string) filepath.WalkFunc {
 			return nil
 		}
 		suffix := strings.ToUpper(filepath.Ext(path))
-		delete(model.NeedConvertSuffix, "."+config.GetDescType())
+		// delete(model.NeedConvertSuffix, "."+config.GetDescType())
 		// log.Printf("%v", model.NeedConvertSuffix)
 
 		_, has := model.NeedConvertSuffix[suffix]
@@ -31,18 +30,21 @@ func visit(files *[]string) filepath.WalkFunc {
 		return nil
 	}
 }
-
-func DelSrc(ch chan string) {
+func DelSrc(isDel model.SwitchState, ch chan string) {
 	for {
 		file := <-ch
+		if isDel == model.OFF {
+			log.Println("不删除源文件，如果需要删除请降 is_del_src 设置为 1")
+			continue
+		}
 		if file != "" {
 			log.Printf("wait del file:%v", file)
 			// 使用 os.Remove() 删除文件
 			err := os.Remove(file)
 			if err != nil {
-				log.Println("%v 删除失败", file)
+				log.Printf("%v 删除失败", file)
 			} else {
-				log.Println("%v 删除成功", file)
+				log.Printf("%v 删除成功", file)
 			}
 		}
 	}
@@ -86,4 +88,20 @@ func splitFiles(files []string) map[string]model.MusicFileInfo {
 		}
 	}
 	return mapFile
+}
+
+// 判断文件夹是否存在
+func MkPathIfNotExists(path string) error {
+	_, err := os.Stat(path)
+	if err == nil {
+		return nil
+	}
+	if !os.IsNotExist(err) {
+		return nil
+	}
+	err = os.MkdirAll(path, os.ModePerm)
+	if err != nil {
+		log.Fatalf("mkdir %v fail\n", path)
+	}
+	return err
 }

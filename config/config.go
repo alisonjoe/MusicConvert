@@ -20,6 +20,8 @@ type Config struct {
 	DescType string `yaml:"desc_type"`
 	// DescPath 目标文件存储位置, 默认和源文件一致
 	DescPath string `yaml:"desc_path"`
+	// OutputRoot 输出目录
+	OutputRoot string `yaml:"output_root"`
 }
 
 func GetDefaultConfig() *Config {
@@ -54,4 +56,11 @@ func Init(config string) *Config {
 
 func GetDescType() string {
 	return cfg.DescType
+}
+
+func GetOutputRoot() string {
+	return cfg.OutputRoot
+}
+func GetIsDelSrc() model.SwitchState {
+	return cfg.IsDelSrc
 }
