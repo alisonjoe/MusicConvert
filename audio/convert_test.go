@@ -189,6 +189,25 @@ func TestConstrainCueAlbumRejectsDifferentBootlegVolume(t *testing.T) {
 	}
 }
 
+func TestAlbumArtistFromAlbumTitleReturnsOrchestraSide(t *testing.T) {
+	got := albumArtistFromAlbumTitle("戴維斯指揮阿姆斯丹大會堂管弦樂團")
+	want := "阿姆斯丹大会堂管弦乐团"
+	if got != want {
+		t.Fatalf("albumArtistFromAlbumTitle() = %q, want %q", got, want)
+	}
+}
+
+func TestCanonicalOrchestraPrefersLongerCandidate(t *testing.T) {
+	got := canonicalOrchestraFromCandidates(
+		"戴緈斯指揮阿姆斯丹大會堂管弦樂團",
+		"戴維斯指揮阿姆斯丹堂管弦樂團",
+	)
+	want := "阿姆斯丹大会堂管弦乐团"
+	if got != want {
+		t.Fatalf("canonicalOrchestraFromCandidates() = %q, want %q", got, want)
+	}
+}
+
 func TestPreferItunesAlbumNameRejectsDifferentBootlegVolume(t *testing.T) {
 	current := "The Bootleg Series Volumes 1-3 (Rare & Unreleased) 1961-1991"
 	got := preferItunesAlbumName(current, "The Bootleg Series, Vol. 9: The Witmark Demos: 1962-1964")
@@ -248,7 +267,7 @@ func TestLooksLikeGenericMusicFolderForPhilipsSource(t *testing.T) {
 
 func TestAlbumArtistFromAlbumTitle(t *testing.T) {
 	got := albumArtistFromAlbumTitle("PHCP-24002史特拉汶斯基「春之祭」。戴維斯指揮阿姆斯丹堂管弦樂團。")
-	want := "戴维斯指挥阿姆斯丹堂管弦乐团"
+	want := "阿姆斯丹堂管弦乐团"
 	if got != want {
 		t.Fatalf("albumArtistFromAlbumTitle() = %q, want %q", got, want)
 	}
@@ -257,7 +276,7 @@ func TestAlbumArtistFromAlbumTitle(t *testing.T) {
 func TestPreferAlbumTitleArtistOverridesGenericPhilipsFolder(t *testing.T) {
 	album := "PHCP-24002史特拉汶斯基「春之祭」。戴維斯指揮阿姆斯丹堂管弦樂團。"
 	gotAlbumArtist, gotTrackArtist := preferAlbumTitleArtist("PHILIPS首版系列纸盒WAV", "PHILIPS首版系列纸盒WAV", album)
-	want := "戴维斯指挥阿姆斯丹堂管弦乐团"
+	want := "阿姆斯丹堂管弦乐团"
 	if gotAlbumArtist != want || gotTrackArtist != want {
 		t.Fatalf("preferAlbumTitleArtist() = %q, %q, want %q, %q", gotAlbumArtist, gotTrackArtist, want, want)
 	}
@@ -359,6 +378,16 @@ func TestTitleFromOnlineTrackUsesChineseOriginalForClassicalGenericTitle(t *test
 	}
 }
 
+func TestTitleFromOnlineTrackBuildsBilingualClassicalTitle(t *testing.T) {
+	meta := parseClassicalAlbumMetadata("PHCP-24002史特拉汶斯基「春之祭」。戴維斯指揮阿姆斯丹堂管弦樂團。")
+	tracks := map[int]string{4: "Dance Of The Firebird"}
+	got := titleFromOnlineTrack(4, "第1场: 火鸟", tracks, meta)
+	want := "第1场: 火鸟-Dance Of The Firebird"
+	if got != want {
+		t.Fatalf("titleFromOnlineTrack() = %q, want %q", got, want)
+	}
+}
+
 func TestOutputTrackFilenameKeepsPrefixForClassicalResolvedTitle(t *testing.T) {
 	meta := parseClassicalAlbumMetadata("PHCP-24002史特拉汶斯基「春之祭」。戴維斯指揮阿姆斯丹堂管弦樂團。")
 	got := outputTrackFilename(1, "Part I: The Adoration Of The Earth: 1. Introduction", ".flac", meta)
@@ -404,7 +433,7 @@ func TestSourceDiscTrackTitlesSkipsGenericTrackNames(t *testing.T) {
 func TestClassicalMetadataSearchHintsUseEnglishAliases(t *testing.T) {
 	meta := parseClassicalAlbumMetadata("PHCP-24002史特拉汶斯基「春之祭」。戴維斯指揮阿姆斯丹堂管弦樂團。")
 	got := strings.Join(meta.SearchHints(), "\n")
-	for _, want := range []string{"Igor Stravinsky", "Le Sacre du printemps", "Colin Davis", "Royal Concertgebouw Orchestra"} {
+	for _, want := range []string{"Igor Stravinsky", "Le Sacre du printemps", "Colin Davis", "阿姆斯丹堂管弦乐团"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("SearchHints() = %q, missing %q", got, want)
 		}

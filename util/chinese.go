@@ -2,7 +2,9 @@ package util
 
 import (
 	"log"
+	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/longbridgeapp/opencc"
 )
@@ -32,4 +34,16 @@ func ToSimplifiedChinese(s string) string {
 		return s
 	}
 	return out
+}
+
+func NormalizeChineseForCompare(s string) string {
+	if s == "" {
+		return s
+	}
+	s = ToSimplifiedChinese(s)
+	s = strings.TrimSpace(s)
+	s = strings.TrimFunc(s, func(r rune) bool {
+		return unicode.IsSpace(r) || unicode.IsControl(r) || unicode.Is(unicode.Cf, r)
+	})
+	return s
 }

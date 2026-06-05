@@ -22,7 +22,6 @@ var (
 	bootlegVolumePattern     = regexp.MustCompile(`(?i)\b(?:vol(?:ume)?s?\.?|volumes?)\s*([0-9]+)(?:\s*[-–—]\s*([0-9]+))?`)
 	bootlegSeriesTitleWords  = regexp.MustCompile(`(?i)\bbootleg\b.*\bseries\b`)
 	genericTrackTitlePattern = regexp.MustCompile(`(?i)^track\s*0*([0-9]+)$`)
-	conductorAlbumPattern    = regexp.MustCompile(`([^。「」]+指挥[^。「」]+(?:管弦乐团|樂團|乐团))`)
 	catalogPrefixPattern     = regexp.MustCompile(`(?i)^\s*([A-Z]{2,}[-_ ]?\d+)\s*`)
 	quotedClassicalPattern   = regexp.MustCompile(`^\s*(?i:[A-Z]{2,}[-_ ]?\d+)?\s*([^「」『』《》]+)[「『《]([^」』》]+)[」』》]`)
 	conductorEnsemblePattern = regexp.MustCompile(`([^。；;，,]+?)指挥([^。；;，,]+?(?:大?会堂管弦乐团|管弦乐团|交响乐团|音乐厅管弦乐团|樂團|乐团|交響樂團))`)
@@ -30,30 +29,25 @@ var (
 )
 
 type classicalMetadata struct {
-	Catalog    string
-	Composer   string
-	Work       string
-	Conductor  string
-	Ensemble   string
-	Performer  string
-	Instrument string
+	Catalog            string
+	Composer           string
+	Work               string
+	Conductor          string
+	Ensemble           string
+	CanonicalOrchestra string
+	Performer          string
+	Instrument         string
 }
 
 var classicalAliases = map[string]string{
-	"史特拉汶斯基":      "Igor Stravinsky",
-	"斯特拉文斯基":      "Igor Stravinsky",
-	"春之祭":         "Le Sacre du printemps",
-	"火鸟":          "The Firebird",
-	"火鳥":          "The Firebird",
-	"彼得洛希卡":       "Petrushka",
-	"戴维斯":         "Colin Davis",
-	"戴維斯":         "Colin Davis",
-	"阿姆斯丹堂管弦乐团":   "Royal Concertgebouw Orchestra",
-	"阿姆斯丹堂管弦樂團":   "Royal Concertgebouw Orchestra",
-	"阿姆斯丹大会堂管弦乐团": "Royal Concertgebouw Orchestra",
-	"阿姆斯丹大會堂管弦樂團": "Royal Concertgebouw Orchestra",
-	"皇家音乐厅管弦乐团":   "Royal Concertgebouw Orchestra",
-	"皇家音樂廳管弦樂團":   "Royal Concertgebouw Orchestra",
+	"史特拉汶斯基": "Igor Stravinsky",
+	"斯特拉文斯基": "Igor Stravinsky",
+	"春之祭":    "Le Sacre du printemps",
+	"火鸟":     "The Firebird",
+	"火鳥":     "The Firebird",
+	"彼得洛希卡":  "Petrushka",
+	"戴维斯":    "Colin Davis",
+	"戴維斯":    "Colin Davis",
 }
 
 // collectAllTags merges tags from ffprobe, CUE sheet, and Netease API
@@ -722,11 +716,7 @@ func shouldTrustLocalMetadata(title, artist, album string) bool {
 
 func albumArtistFromAlbumTitle(album string) string {
 	album = normalizeClassicalAlbumText(album)
-	matches := conductorAlbumPattern.FindStringSubmatch(album)
-	if len(matches) >= 2 {
-		return strings.TrimSpace(matches[1])
-	}
-	return ""
+	return orchestraCandidateFromText(album)
 }
 
 func normalizeClassicalAlbumText(album string) string {
@@ -751,6 +741,11 @@ func parseClassicalAlbumMetadata(album string) classicalMetadata {
 		meta.Ensemble = strings.TrimSpace(matches[2])
 		meta.Performer = strings.TrimSpace(meta.Conductor + "指挥" + meta.Ensemble)
 	}
+	if meta.Ensemble == "" {
+		if candidate := orchestraCandidateFromText(album); candidate != "" {
+			meta.Ensemble = candidate
+		}
+	}
 	if meta.Performer == "" {
 		if matches := instrumentalistPattern.FindStringSubmatch(album); len(matches) >= 3 {
 			meta.Performer = strings.TrimSpace(matches[1])
@@ -764,6 +759,19 @@ func (m classicalMetadata) IsClassical() bool {
 	return m.Composer != "" || m.Work != "" || m.Conductor != "" || m.Ensemble != "" || m.Instrument != ""
 }
 
+func (m classicalMetadata) OrchestraName() string {
+	if m.CanonicalOrchestra != "" {
+		return m.CanonicalOrchestra
+	}
+	if m.Ensemble != "" {
+		return m.Ensemble
+	}
+	if m.Performer != "" {
+		return orchestraCandidateFromText(m.Performer)
+	}
+	return ""
+}
+
 func (m classicalMetadata) AlbumName(fallback string) string {
 	if m.Composer != "" && m.Work != "" {
 		return normalizeAlbumName(m.Composer + ": " + m.Work)
@@ -775,11 +783,8 @@ func (m classicalMetadata) AlbumName(fallback string) string {
 }
 
 func (m classicalMetadata) PreferredArtist(fallback string) string {
-	if m.Performer != "" {
-		return m.Performer
-	}
-	if m.Ensemble != "" {
-		return m.Ensemble
+	if orchestra := m.OrchestraName(); orchestra != "" {
+		return orchestra
 	}
 	if m.Composer != "" {
 		return m.Composer
@@ -814,11 +819,11 @@ func (m classicalMetadata) SearchHints() []string {
 	composerAlias := classicalAlias(m.Composer)
 	workAlias := classicalAlias(m.Work)
 	conductorAlias := classicalAlias(m.Conductor)
-	ensembleAlias := classicalAlias(m.Ensemble)
+	ensembleAlias := classicalAlias(m.OrchestraName())
 	add(m.Catalog, composerAlias, workAlias, conductorAlias, ensembleAlias)
 	add(composerAlias, workAlias, conductorAlias)
 	add(workAlias, conductorAlias, ensembleAlias)
-	add(m.Catalog, m.Composer, m.Work, m.Performer)
+	add(m.Catalog, m.Composer, m.Work, m.Performer, m.OrchestraName())
 	return hints
 }
 
@@ -858,6 +863,62 @@ func localizedArtistName(name string) string {
 		return simplifyMetadataText(canonical)
 	}
 	return name
+}
+
+func orchestraCandidateFromText(text string) string {
+	text = normalizeClassicalAlbumText(text)
+	if text == "" {
+		return ""
+	}
+	if matches := conductorEnsemblePattern.FindStringSubmatch(text); len(matches) >= 3 {
+		return strings.TrimSpace(matches[2])
+	}
+	lower := strings.ToLower(text)
+	if strings.Contains(lower, "orchestra") ||
+		strings.Contains(lower, "philharmonic") ||
+		strings.Contains(lower, "symphony") ||
+		strings.Contains(lower, "ensemble") ||
+		strings.Contains(text, "管弦乐团") ||
+		strings.Contains(text, "管弦樂團") ||
+		strings.Contains(text, "交响乐团") ||
+		strings.Contains(text, "交響樂團") ||
+		strings.Contains(text, "乐团") ||
+		strings.Contains(text, "樂團") {
+		return strings.TrimSpace(text)
+	}
+	return ""
+}
+
+func canonicalOrchestraFromCandidates(candidates ...string) string {
+	best := ""
+	bestLen := -1
+	for _, candidate := range candidates {
+		candidate = orchestraCandidateFromText(candidate)
+		candidate = util.NormalizeChineseForCompare(candidate)
+		candidate = normalizeAlbumName(candidate)
+		if candidate == "" {
+			continue
+		}
+		length := len([]rune(candidate))
+		if length > bestLen {
+			best = candidate
+			bestLen = length
+		}
+	}
+	return best
+}
+
+func resolveCanonicalClassicalMetadata(meta classicalMetadata, candidates ...string) classicalMetadata {
+	orchestra := canonicalOrchestraFromCandidates(append(candidates, meta.CanonicalOrchestra, meta.Ensemble, meta.Performer)...)
+	if orchestra == "" {
+		return meta
+	}
+	meta.CanonicalOrchestra = orchestra
+	meta.Ensemble = orchestra
+	if meta.Conductor != "" {
+		meta.Performer = strings.TrimSpace(meta.Conductor + "指挥" + orchestra)
+	}
+	return meta
 }
 
 func enrichClassicalMetadataFromDiscogs(meta classicalMetadata, release api.DiscogsReleaseMeta) classicalMetadata {
@@ -936,9 +997,9 @@ func applyClassicalMetadataTags(tags map[string]string, meta classicalMetadata) 
 	if meta.Conductor != "" {
 		tags["CONDUCTOR"] = meta.Conductor
 	}
-	if meta.Ensemble != "" {
-		tags["ORCHESTRA"] = meta.Ensemble
-		tags["ENSEMBLE"] = meta.Ensemble
+	if orchestra := meta.OrchestraName(); orchestra != "" {
+		tags["ORCHESTRA"] = orchestra
+		tags["ENSEMBLE"] = orchestra
 	}
 	if meta.Performer != "" {
 		tags["PERFORMER"] = meta.Performer
@@ -968,11 +1029,31 @@ func combinedLocalizedTitle(chinese, original string) string {
 
 func titleFromOnlineTrack(trackNum int, currentTitle string, trackTitles map[int]string, classicalMeta classicalMetadata) string {
 	onlineTitle := strings.TrimSpace(trackTitles[trackNum])
+	currentTitle = normalizeAlbumName(currentTitle)
+	onlineTitle = normalizeAlbumName(onlineTitle)
 	if onlineTitle == "" || looksLikeGenericTrackTitle(onlineTitle) {
 		return currentTitle
 	}
 	if classicalMeta.IsClassical() {
-		return onlineTitle
+		if currentTitle == "" || looksLikeGenericTrackTitle(currentTitle) {
+			return onlineTitle
+		}
+		currentHasChinese := api.ContainsChinese(currentTitle)
+		onlineHasChinese := api.ContainsChinese(onlineTitle)
+		switch {
+		case currentHasChinese && !onlineHasChinese:
+			return combinedLocalizedTitle(currentTitle, onlineTitle)
+		case !currentHasChinese && onlineHasChinese:
+			return combinedLocalizedTitle(onlineTitle, currentTitle)
+		case currentTitle == onlineTitle:
+			return currentTitle
+		case strings.Contains(onlineTitle, currentTitle) || strings.Contains(currentTitle, onlineTitle):
+			return combinedLocalizedTitle(currentTitle, onlineTitle)
+		case len([]rune(onlineTitle)) >= len([]rune(currentTitle)):
+			return onlineTitle
+		default:
+			return currentTitle
+		}
 	}
 	if looksLikeGenericTrackTitle(currentTitle) {
 		return onlineTitle
@@ -1295,6 +1376,9 @@ PROCESS_PATH:
 	finalMainArtist = simplifyMetadataText(finalMainArtist)
 	finalMainArtist, officialArtist = preferAlbumTitleArtist(finalMainArtist, officialArtist, officialAlbum)
 	if classicalMeta.IsClassical() {
+		classicalMeta = resolveCanonicalClassicalMetadata(classicalMeta,
+			officialAlbum, origAlbum, sourceAlbumDir, officialArtist, finalMainArtist,
+			classicalMeta.Ensemble, classicalMeta.Performer)
 		finalMainArtist = classicalMeta.PreferredArtist(finalMainArtist)
 		officialArtist = classicalMeta.PreferredArtist(officialArtist)
 	}
@@ -1501,6 +1585,16 @@ PROCESS_CUE:
 	finalMainArtist = simplifyMetadataText(finalMainArtist)
 	finalMainArtist, officialArtist = preferAlbumTitleArtist(finalMainArtist, officialArtist, officialAlbum)
 	if classicalMeta.IsClassical() {
+		var orchestraCandidates []string
+		orchestraCandidates = append(orchestraCandidates,
+			officialAlbum, cueAlbumTitle, albumHint, sourceAlbumDir,
+			officialArtist, finalMainArtist, origArtist, cueSheet.Performer,
+			classicalMeta.Ensemble, classicalMeta.Performer,
+		)
+		for _, track := range cueSheet.Tracks {
+			orchestraCandidates = append(orchestraCandidates, track.Performer)
+		}
+		classicalMeta = resolveCanonicalClassicalMetadata(classicalMeta, orchestraCandidates...)
 		finalMainArtist = classicalMeta.PreferredArtist(finalMainArtist)
 		officialArtist = classicalMeta.PreferredArtist(officialArtist)
 	}
