@@ -24,8 +24,9 @@ import (
 const neteaseOpenAPIBase = "https://openapi.music.163.com"
 
 var (
-	openAPIToken     string
-	openAPITokenLock sync.Mutex
+	openAPIToken       string
+	openAPITokenFailed bool
+	openAPITokenLock   sync.Mutex
 )
 
 type openAPIArtist struct {
@@ -189,11 +190,15 @@ func getOpenAPIAccessToken() (string, error) {
 		log.Printf("[Netease OpenAPI] Using cached anonymous access token")
 		return openAPIToken, nil
 	}
+	if openAPITokenFailed {
+		return "", fmt.Errorf("netease openapi anonymous token previously failed")
+	}
 	log.Printf("[Netease OpenAPI] Requesting anonymous access token")
 	body, err := openAPIRequest("/openapi/music/basic/oauth2/login/anonymous", map[string]any{
 		"clientId": config.GetNeteaseAppID(),
 	}, "")
 	if err != nil {
+		openAPITokenFailed = true
 		return "", err
 	}
 	var res openAPITokenResp
@@ -201,6 +206,7 @@ func getOpenAPIAccessToken() (string, error) {
 		return "", err
 	}
 	if res.Code != 200 || res.Data.AccessToken == "" {
+		openAPITokenFailed = true
 		return "", fmt.Errorf("netease openapi anonymous token failed: code=%d message=%s body=%s", res.Code, res.Message, string(body))
 	}
 	openAPIToken = res.Data.AccessToken

@@ -1021,7 +1021,11 @@ func preferClassicalCreditName(local, external string) string {
 	if external == "" {
 		return local
 	}
-	return localizedArtistName(external)
+	localized := localizedArtistName(external)
+	if api.ContainsChinese(local) && !api.ContainsChinese(localized) {
+		return local
+	}
+	return localized
 }
 
 func hasChineseClassicalContext(meta classicalMetadata) bool {
@@ -1130,6 +1134,25 @@ func combinedLocalizedTitle(chinese, original string) string {
 	return chinese + "-" + original
 }
 
+func containsKana(s string) bool {
+	for _, r := range s {
+		if (r >= 0x3040 && r <= 0x30ff) || (r >= 0x31f0 && r <= 0x31ff) {
+			return true
+		}
+	}
+	return false
+}
+
+func shouldPrefixChineseWork(classicalMeta classicalMetadata, title string) bool {
+	if !api.ContainsChinese(classicalMeta.Work) {
+		return false
+	}
+	if !api.ContainsChinese(title) || containsKana(title) {
+		return true
+	}
+	return false
+}
+
 func titleFromOnlineTrack(trackNum int, currentTitle string, trackTitles map[int]string, classicalMeta classicalMetadata) string {
 	onlineTitle := strings.TrimSpace(trackTitles[trackNum])
 	currentTitle = normalizeAlbumName(currentTitle)
@@ -1139,7 +1162,7 @@ func titleFromOnlineTrack(trackNum int, currentTitle string, trackTitles map[int
 	}
 	if classicalMeta.IsClassical() {
 		if currentTitle == "" || looksLikeGenericTrackTitle(currentTitle) {
-			if !api.ContainsChinese(onlineTitle) && api.ContainsChinese(classicalMeta.Work) {
+			if shouldPrefixChineseWork(classicalMeta, onlineTitle) {
 				return combinedLocalizedTitle(classicalMeta.Work, onlineTitle)
 			}
 			return onlineTitle

@@ -406,6 +406,18 @@ func TestEnrichClassicalMetadataFromDiscogsDoesNotUseComposerAsConductor(t *test
 	}
 }
 
+func TestEnrichClassicalMetadataFromDiscogsKeepsChineseEnsembleWhenExternalNotLocalized(t *testing.T) {
+	meta := parseClassicalAlbumMetadata("phcp-24010舒伯特：「鱲魚」鋼琴五重奏。布蘭德爾鋼琴，克里夫蘭弦樂四重奏。")
+	got := enrichClassicalMetadataFromDiscogs(meta, api.DiscogsReleaseMeta{
+		ID:      35096795,
+		Title:   "Piano Quintet, Op.114 \"Trout\"",
+		Artists: []string{"Members Of The Cleveland Quartet"},
+	})
+	if got.Ensemble != "克里夫兰弦乐四重奏" {
+		t.Fatalf("Ensemble = %q, want local Chinese ensemble", got.Ensemble)
+	}
+}
+
 func TestParseClassicalAlbumMetadataDoesNotLetCatalogPolluteComposer(t *testing.T) {
 	got := parseClassicalAlbumMetadata("phcp-24003史特拉汶斯基「火鴅」。戴緎斯指揮阿姆斯丹大會堂管弦樂坒。")
 	if got.Catalog != "PHCP-24003" {
@@ -482,6 +494,15 @@ func TestTitleFromOnlineTrackPrefixesChineseWorkForClassicalGenericTitle(t *test
 	want := "春之祭-The Rite of Spring: Part II. The Sacrifice"
 	if got != want {
 		t.Fatalf("titleFromOnlineTrack() = %q, want %q", got, want)
+	}
+}
+
+func TestTitleFromOnlineTrackPrefixesChineseWorkForKanaClassicalTitle(t *testing.T) {
+	meta := parseClassicalAlbumMetadata("phcp-24010舒伯特：「鱲魚」鋼琴五重奏。布蘭德爾鋼琴，克里夫蘭弦樂四重奏。")
+	tracks := map[int]string{1: "ピアノ五重奏曲 イ长调 作品114 D.667 ≪ます≫ = Piano Quintet In A, Op.114, D.667 \"The Trout\": 1. Allegro Vivace"}
+	got := titleFromOnlineTrack(1, "Track01", tracks, meta)
+	if !strings.HasPrefix(got, "鳟鱼钢琴五重奏-") {
+		t.Fatalf("titleFromOnlineTrack() = %q, want Chinese work prefix", got)
 	}
 }
 
