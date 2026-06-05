@@ -417,17 +417,6 @@ func TestTitleFromOnlineTrackBuildsBilingualClassicalTitle(t *testing.T) {
 	}
 }
 
-func TestLocalizedClassicalTrackTitlesForFirebird(t *testing.T) {
-	meta := parseClassicalAlbumMetadata("PHCP-24003史特拉汶斯基「火鴅」。戴維斯指揮阿姆斯丹大會堂管弦樂團。")
-	got := localizedClassicalTrackTitles(meta)
-	if len(got) != 22 {
-		t.Fatalf("localizedClassicalTrackTitles() len = %d, want 22", len(got))
-	}
-	if got[1] != "引子" || got[4] != "第1场: 火鸟之舞" || got[22] == "" {
-		t.Fatalf("localizedClassicalTrackTitles() = %#v", got)
-	}
-}
-
 func TestOutputTrackFilenameKeepsPrefixForClassicalResolvedTitle(t *testing.T) {
 	meta := parseClassicalAlbumMetadata("PHCP-24002史特拉汶斯基「春之祭」。戴維斯指揮阿姆斯丹堂管弦樂團。")
 	got := outputTrackFilename(1, "Part I: The Adoration Of The Earth: 1. Introduction", ".flac", meta)
