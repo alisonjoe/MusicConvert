@@ -208,6 +208,17 @@ func TestCanonicalOrchestraPrefersLongerCandidate(t *testing.T) {
 	}
 }
 
+func TestCanonicalOrchestraPrefersChineseCandidate(t *testing.T) {
+	got := canonicalOrchestraFromCandidates(
+		"Royal Concertgebouw Orchestra",
+		"戴維斯指揮阿姆斯丹大會堂管弦樂團",
+	)
+	want := "阿姆斯丹大会堂管弦乐团"
+	if got != want {
+		t.Fatalf("canonicalOrchestraFromCandidates() = %q, want %q", got, want)
+	}
+}
+
 func TestPreferItunesAlbumNameRejectsDifferentBootlegVolume(t *testing.T) {
 	current := "The Bootleg Series Volumes 1-3 (Rare & Unreleased) 1961-1991"
 	got := preferItunesAlbumName(current, "The Bootleg Series, Vol. 9: The Witmark Demos: 1962-1964")
@@ -344,6 +355,21 @@ func TestEnrichClassicalMetadataFromDiscogsRelease(t *testing.T) {
 		t.Fatalf("Performer = %q, should not keep dirty local conductor", got.Performer)
 	}
 	if got.AlbumName("fallback") != "史特拉汶斯基: L'Oiseau De Feu" {
+		t.Fatalf("AlbumName() = %q", got.AlbumName("fallback"))
+	}
+}
+
+func TestEnrichClassicalMetadataFromDiscogsKeepsValidChineseAlbum(t *testing.T) {
+	meta := parseClassicalAlbumMetadata("phcp-24003史特拉汶斯基「火鳥」。戴維斯指揮阿姆斯丹大會堂管弦樂團。")
+	got := enrichClassicalMetadataFromDiscogs(meta, api.DiscogsReleaseMeta{
+		ID:      35094653,
+		Title:   "L'Oiseau De Feu (Complete Original Version)",
+		Artists: []string{"Igor Stravinsky"},
+	})
+	if got.Composer != "史特拉汶斯基" || got.Work != "火鸟" {
+		t.Fatalf("Composer/Work = %q/%q, want Chinese local values", got.Composer, got.Work)
+	}
+	if got.AlbumName("fallback") != "史特拉汶斯基: 火鸟" {
 		t.Fatalf("AlbumName() = %q", got.AlbumName("fallback"))
 	}
 }

@@ -892,6 +892,8 @@ func orchestraCandidateFromText(text string) string {
 func canonicalOrchestraFromCandidates(candidates ...string) string {
 	best := ""
 	bestLen := -1
+	bestChinese := ""
+	bestChineseLen := -1
 	for _, candidate := range candidates {
 		candidate = orchestraCandidateFromText(candidate)
 		candidate = util.NormalizeChineseForCompare(candidate)
@@ -900,10 +902,17 @@ func canonicalOrchestraFromCandidates(candidates ...string) string {
 			continue
 		}
 		length := len([]rune(candidate))
+		if api.ContainsChinese(candidate) && length > bestChineseLen {
+			bestChinese = candidate
+			bestChineseLen = length
+		}
 		if length > bestLen {
 			best = candidate
 			bestLen = length
 		}
+	}
+	if bestChinese != "" {
+		return bestChinese
 	}
 	return best
 }
@@ -921,15 +930,34 @@ func resolveCanonicalClassicalMetadata(meta classicalMetadata, candidates ...str
 	return meta
 }
 
+func preferLocalClassicalText(local, external string) string {
+	local = strings.TrimSpace(local)
+	external = strings.TrimSpace(external)
+	if local == "" {
+		return external
+	}
+	if external == "" {
+		return local
+	}
+	if api.ContainsChinese(local) && classicalAlias(local) != "" {
+		return local
+	}
+	return external
+}
+
+func hasChineseClassicalContext(meta classicalMetadata) bool {
+	return api.ContainsChinese(meta.Composer) || api.ContainsChinese(meta.Work) || api.ContainsChinese(meta.AlbumName(""))
+}
+
 func enrichClassicalMetadataFromDiscogs(meta classicalMetadata, release api.DiscogsReleaseMeta) classicalMetadata {
 	if release.ID <= 0 {
 		return meta
 	}
 	if work := classicalWorkFromDiscogsTitle(release.Title); work != "" {
-		meta.Work = work
+		meta.Work = preferLocalClassicalText(meta.Work, work)
 	}
 	if composer := classicalComposerFromDiscogsArtists(release.Artists); composer != "" {
-		meta.Composer = composer
+		meta.Composer = preferLocalClassicalText(meta.Composer, composer)
 	}
 	discogsConductor := ""
 	discogsEnsemble := ""
@@ -1069,6 +1097,14 @@ func fetchDiscogsMetaForClassical(classicalMeta classicalMetadata) (api.DiscogsR
 }
 
 func albumTrackTitlesForConversion(filePath, artist, album string, classicalMeta classicalMetadata) (map[int]string, string) {
+	if sourceTracks := sourceDiscTrackTitles(filePath); len(sourceTracks) > 0 {
+		return sourceTracks, "source_dir"
+	}
+	if classicalMeta.IsClassical() && hasChineseClassicalContext(classicalMeta) {
+		if tracks, source := api.GetAlbumTrackTitlesWithSource(artist, album); len(tracks) > 0 {
+			return tracks, source
+		}
+	}
 	if classicalMeta.IsClassical() {
 		if tracks, source := api.FetchMBReleaseTrackTitles(classicalMeta.Catalog, ""); len(tracks) > 0 {
 			return tracks, source
@@ -1078,9 +1114,6 @@ func albumTrackTitlesForConversion(filePath, artist, album string, classicalMeta
 				return tracks, source
 			}
 		}
-	}
-	if sourceTracks := sourceDiscTrackTitles(filePath); len(sourceTracks) > 0 {
-		return sourceTracks, "source_dir"
 	}
 	if tracks, source := api.GetAlbumTrackTitlesWithSource(artist, album); len(tracks) > 0 {
 		return tracks, source
@@ -1630,10 +1663,13 @@ PROCESS_CUE:
 	util.MkPathIfNotExists(basePath)
 	var onlineTrackTitles map[int]string
 	onlineTrackTitleSource := ""
-	if len(discogsMeta.Tracks) > 0 {
+	if len(discogsMeta.Tracks) > 0 && !hasChineseClassicalContext(classicalMeta) {
 		onlineTrackTitles, onlineTrackTitleSource = discogsMeta.Tracks, discogsSource
 	} else {
 		onlineTrackTitles, onlineTrackTitleSource = albumTrackTitlesForConversion(st.FilePath, finalMainArtist, officialAlbum, classicalMeta)
+		if len(onlineTrackTitles) == 0 && len(discogsMeta.Tracks) > 0 {
+			onlineTrackTitles, onlineTrackTitleSource = discogsMeta.Tracks, discogsSource
+		}
 	}
 
 	coverPath := ""
