@@ -76,6 +76,22 @@ type DiscogsCredit struct {
 }
 
 func discogsGetJSON(apiURL string, out any) error {
+	var lastErr error
+	for attempt := 1; attempt <= 2; attempt++ {
+		if err := discogsGetJSONOnce(apiURL, out); err != nil {
+			lastErr = err
+			log.Printf("[Discogs] request failed (attempt %d/2): %v", attempt, err)
+			if attempt < 2 {
+				time.Sleep(time.Duration(attempt) * time.Second)
+			}
+			continue
+		}
+		return nil
+	}
+	return lastErr
+}
+
+func discogsGetJSONOnce(apiURL string, out any) error {
 	token := config.GetDiscogsToken()
 	if token == "" {
 		return fmt.Errorf("discogs token not configured")

@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-var wikipediaClient = &http.Client{Timeout: 15 * time.Second}
+var wikipediaClient = &http.Client{Timeout: 6 * time.Second}
 
 func FetchWikipediaClassicalTrackTitles(work, composer string) (map[int]string, string) {
 	work = strings.TrimSpace(work)
@@ -20,7 +20,10 @@ func FetchWikipediaClassicalTrackTitles(work, composer string) (map[int]string, 
 	if work == "" {
 		return nil, "empty: wikipedia work missing"
 	}
-	queries := []string{strings.TrimSpace(work + " " + composer + " 曲目"), strings.TrimSpace(work + " " + composer), work}
+	queries := []string{strings.TrimSpace(work + " " + composer + " 曲目"), strings.TrimSpace(work + " " + composer)}
+	if composer == "" {
+		queries = append(queries, work)
+	}
 	for _, query := range queries {
 		if query == "" {
 			continue
