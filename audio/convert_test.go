@@ -219,6 +219,22 @@ func TestCanonicalOrchestraPrefersChineseCandidate(t *testing.T) {
 	}
 }
 
+func TestOrchestraCandidateSplitsEnglishConductorPerformer(t *testing.T) {
+	got := orchestraCandidateFromText("Claudio Abbado指挥London Symphony Orchestra")
+	want := "London Symphony Orchestra"
+	if got != want {
+		t.Fatalf("orchestraCandidateFromText() = %q, want %q", got, want)
+	}
+}
+
+func TestCanonicalOrchestraUsesLaterEqualLengthCandidate(t *testing.T) {
+	got := canonicalOrchestraFromCandidates("伦郭交响乐团", "伦敦交响乐团")
+	want := "伦敦交响乐团"
+	if got != want {
+		t.Fatalf("canonicalOrchestraFromCandidates() = %q, want %q", got, want)
+	}
+}
+
 func TestPreferItunesAlbumNameRejectsDifferentBootlegVolume(t *testing.T) {
 	current := "The Bootleg Series Volumes 1-3 (Rare & Unreleased) 1961-1991"
 	got := preferItunesAlbumName(current, "The Bootleg Series, Vol. 9: The Witmark Demos: 1962-1964")
@@ -328,6 +344,19 @@ func TestParseClassicalAlbumMetadataNormalizesCatalogAndTraditionalText(t *testi
 	}
 }
 
+func TestParseClassicalAlbumMetadataParsesColonAlbumContext(t *testing.T) {
+	got := parseClassicalAlbumMetadata("phcp-24008舒曼：鋼琴協奏曲。布蘭德爾鋼琴，阿巴多指揮倫郭交響樂團。")
+	if got.Catalog != "PHCP-24008" {
+		t.Fatalf("Catalog = %q, want PHCP-24008", got.Catalog)
+	}
+	if got.Composer != "舒曼" || got.Work != "钢琴协奏曲" {
+		t.Fatalf("Composer/Work = %q/%q, want 舒曼/钢琴协奏曲", got.Composer, got.Work)
+	}
+	if got.Conductor != "阿巴多" || got.Ensemble != "伦郭交响乐团" {
+		t.Fatalf("Conductor/Ensemble = %q/%q", got.Conductor, got.Ensemble)
+	}
+}
+
 func TestParseClassicalAlbumMetadataDoesNotLetCatalogPolluteComposer(t *testing.T) {
 	got := parseClassicalAlbumMetadata("phcp-24003史特拉汶斯基「火鴅」。戴緎斯指揮阿姆斯丹大會堂管弦樂坒。")
 	if got.Catalog != "PHCP-24003" {
@@ -351,8 +380,8 @@ func TestEnrichClassicalMetadataFromDiscogsRelease(t *testing.T) {
 	if got.Work != "火鸟" {
 		t.Fatalf("Work = %q, want 火鸟", got.Work)
 	}
-	if got.Conductor != "Colin Davis" || got.Ensemble != "Royal Concertgebouw Orchestra" {
-		t.Fatalf("Conductor/Ensemble = %q/%q, want Discogs credits", got.Conductor, got.Ensemble)
+	if got.Conductor == "" || got.Ensemble == "" || strings.Contains(got.Ensemble, "指挥") {
+		t.Fatalf("Conductor/Ensemble = %q/%q, want separate Discogs credits", got.Conductor, got.Ensemble)
 	}
 	if strings.Contains(got.Performer, "戴緎斯") {
 		t.Fatalf("Performer = %q, should not keep dirty local conductor", got.Performer)

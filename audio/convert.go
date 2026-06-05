@@ -24,6 +24,7 @@ var (
 	genericTrackTitlePattern = regexp.MustCompile(`(?i)^track\s*0*([0-9]+)$`)
 	catalogPrefixPattern     = regexp.MustCompile(`(?i)^\s*([A-Z]{2,}[-_ ]?\d+)\s*`)
 	quotedClassicalPattern   = regexp.MustCompile(`^\s*(?i:[A-Z]{2,}[-_ ]?\d+)?\s*([^「」『』《》]+)[「『《]([^」』》]+)[」』》]`)
+	colonClassicalPattern    = regexp.MustCompile(`^\s*(?i:[A-Z]{2,}[-_ ]?\d+)?\s*([^:：。「」]+)[:：]\s*([^。]+)`)
 	conductorEnsemblePattern = regexp.MustCompile(`([^。；;，,]+?)指挥([^。；;，,]+?(?:大?会堂管弦乐团|管弦乐团|交响乐团|音乐厅管弦乐团|樂團|乐团|交響樂團))`)
 	instrumentalistPattern   = regexp.MustCompile(`([^。；;，,]+?)(钢琴|小提琴|大提琴|吉他|古筝|琵琶|长笛|单簧管|双簧管|萨克斯|竖琴|风琴|管风琴)`)
 )
@@ -738,6 +739,12 @@ func parseClassicalAlbumMetadata(album string) classicalMetadata {
 		if meta.Catalog != "" {
 			meta.Composer = strings.TrimSpace(catalogPrefixPattern.ReplaceAllString(meta.Composer, ""))
 		}
+	} else if matches := colonClassicalPattern.FindStringSubmatch(album); len(matches) >= 3 {
+		meta.Composer = strings.Trim(strings.TrimSpace(matches[1]), " -_.。")
+		meta.Work = strings.TrimSpace(matches[2])
+		if meta.Catalog != "" {
+			meta.Composer = strings.TrimSpace(catalogPrefixPattern.ReplaceAllString(meta.Composer, ""))
+		}
 	}
 	if matches := conductorEnsemblePattern.FindStringSubmatch(album); len(matches) >= 3 {
 		meta.Conductor = strings.TrimSpace(matches[1])
@@ -877,6 +884,16 @@ func orchestraCandidateFromText(text string) string {
 		return strings.TrimSpace(matches[2])
 	}
 	lower := strings.ToLower(text)
+	if idx := strings.LastIndex(text, "指挥"); idx >= 0 {
+		right := strings.TrimSpace(text[idx+len("指挥"):])
+		rightLower := strings.ToLower(right)
+		if strings.Contains(rightLower, "orchestra") ||
+			strings.Contains(rightLower, "philharmonic") ||
+			strings.Contains(rightLower, "symphony") ||
+			strings.Contains(rightLower, "ensemble") {
+			return right
+		}
+	}
 	if strings.Contains(lower, "orchestra") ||
 		strings.Contains(lower, "philharmonic") ||
 		strings.Contains(lower, "symphony") ||
@@ -905,11 +922,11 @@ func canonicalOrchestraFromCandidates(candidates ...string) string {
 			continue
 		}
 		length := len([]rune(candidate))
-		if api.ContainsChinese(candidate) && length > bestChineseLen {
+		if api.ContainsChinese(candidate) && length >= bestChineseLen {
 			bestChinese = candidate
 			bestChineseLen = length
 		}
-		if length > bestLen {
+		if length >= bestLen {
 			best = candidate
 			bestLen = length
 		}
@@ -942,10 +959,19 @@ func preferLocalClassicalText(local, external string) string {
 	if external == "" {
 		return local
 	}
-	if api.ContainsChinese(local) && classicalAlias(local) != "" {
+	if api.ContainsChinese(local) && (classicalAlias(local) != "" || !api.ContainsChinese(external)) {
 		return local
 	}
 	return external
+}
+
+func preferClassicalCreditName(local, external string) string {
+	local = strings.TrimSpace(local)
+	external = strings.TrimSpace(external)
+	if external == "" {
+		return local
+	}
+	return localizedArtistName(external)
 }
 
 func hasChineseClassicalContext(meta classicalMetadata) bool {
@@ -990,10 +1016,10 @@ func enrichClassicalMetadataFromDiscogs(meta classicalMetadata, release api.Disc
 		}
 	}
 	if discogsConductor != "" {
-		meta.Conductor = discogsConductor
+		meta.Conductor = preferClassicalCreditName(meta.Conductor, discogsConductor)
 	}
 	if discogsEnsemble != "" {
-		meta.Ensemble = discogsEnsemble
+		meta.Ensemble = preferClassicalCreditName(meta.Ensemble, discogsEnsemble)
 	}
 	if meta.Conductor != "" && meta.Ensemble != "" {
 		meta.Performer = meta.Conductor + "指挥" + meta.Ensemble
