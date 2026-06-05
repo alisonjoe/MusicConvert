@@ -25,6 +25,7 @@ var (
 	catalogPrefixPattern     = regexp.MustCompile(`(?i)^\s*([A-Z]{2,}[-_ ]?\d+)\s*`)
 	quotedClassicalPattern   = regexp.MustCompile(`^\s*(?i:[A-Z]{2,}[-_ ]?\d+)?\s*([^「」『』《》]+)[「『《]([^」』》]+)[」』》]`)
 	colonClassicalPattern    = regexp.MustCompile(`^\s*(?i:[A-Z]{2,}[-_ ]?\d+)?\s*([^:：。「」]+)[:：]\s*([^。]+)`)
+	hyphenClassicalPattern   = regexp.MustCompile(`^\s*(?i:[A-Z]{2,}[-_ ]?\d+)?\s*([\p{Han}A-Za-z][^-。]+)-\s*([^。]+?(?:协奏曲|奏鸣曲|交响曲|五重奏|四重奏|三重奏|Concerto|Sonata|Symphony|Quintet|Quartet|Trio)[^。]*)`)
 	conductorEnsemblePattern = regexp.MustCompile(`([^。；;，,]+?)指挥([^。；;，,]+?(?:大?会堂管弦乐团|管弦乐团|交响乐团|音乐厅管弦乐团|樂團|乐团|交響樂團))`)
 	instrumentalistPattern   = regexp.MustCompile(`([^。；;，,]+?)(钢琴|小提琴|大提琴|吉他|古筝|琵琶|长笛|单簧管|双簧管|萨克斯|竖琴|风琴|管风琴)`)
 )
@@ -415,6 +416,7 @@ func primaryAlbumArtist(candidate string) string {
 
 func normalizeArtistName(artist string) string {
 	artist = strings.TrimSpace(artist)
+	artist = cleanClassicalNameNoise(artist)
 	if artist == "" {
 		return artist
 	}
@@ -628,6 +630,24 @@ func albumDirName(album, year string) string {
 	return fmt.Sprintf("%s [%s]", album, year)
 }
 
+func cleanClassicalNameNoise(s string) string {
+	s = strings.TrimSpace(s)
+	runes := []rune(s)
+	i := 0
+	for i < len(runes) && runes[i] >= '0' && runes[i] <= '9' {
+		i++
+	}
+	j := i
+	for j < len(runes) && strings.ContainsRune("_ -.", runes[j]) {
+		j++
+	}
+	if i > 0 && j < len(runes) && runes[j] >= 0x4e00 && runes[j] <= 0x9fff && runes[j] != '首' {
+		s = strings.TrimSpace(string(runes[j:]))
+	}
+	s = strings.TrimRight(s, ":：")
+	return s
+}
+
 func normalizeAlbumName(album string) string {
 	replacer := strings.NewReplacer(
 		"‐", "-",
@@ -640,8 +660,16 @@ func normalizeAlbumName(album string) string {
 		"’", "'",
 		"“", "\"",
 		"”", "\"",
+		"𫚭", "鳟",
 	)
-	return util.ToSimplifiedChinese(strings.TrimSpace(replacer.Replace(album)))
+	album = util.ToSimplifiedChinese(strings.TrimSpace(replacer.Replace(album)))
+	album = cleanClassicalNameNoise(album)
+	album = strings.ReplaceAll(album, ":-", ": ")
+	album = strings.ReplaceAll(album, ": -", ": ")
+	album = strings.ReplaceAll(album, "：-", ": ")
+	album = strings.ReplaceAll(album, "： -", ": ")
+	album = strings.Join(strings.Fields(album), " ")
+	return strings.TrimSpace(album)
 }
 
 func simplifyMetadataText(s string) string {
@@ -745,7 +773,18 @@ func parseClassicalAlbumMetadata(album string) classicalMetadata {
 		if meta.Catalog != "" {
 			meta.Composer = strings.TrimSpace(catalogPrefixPattern.ReplaceAllString(meta.Composer, ""))
 		}
+	} else if matches := hyphenClassicalPattern.FindStringSubmatch(album); len(matches) >= 3 {
+		meta.Composer = strings.Trim(strings.TrimSpace(matches[1]), " -_.。")
+		meta.Work = strings.TrimSpace(matches[2])
+		if idx := strings.Index(meta.Work, "-"); idx >= 0 {
+			meta.Work = strings.TrimSpace(meta.Work[:idx])
+		}
+		if meta.Catalog != "" {
+			meta.Composer = strings.TrimSpace(catalogPrefixPattern.ReplaceAllString(meta.Composer, ""))
+		}
 	}
+	meta.Composer = cleanClassicalNameNoise(meta.Composer)
+	meta.Work = cleanClassicalNameNoise(meta.Work)
 	if matches := conductorEnsemblePattern.FindStringSubmatch(album); len(matches) >= 3 {
 		meta.Conductor = strings.TrimSpace(matches[1])
 		meta.Ensemble = strings.TrimSpace(matches[2])

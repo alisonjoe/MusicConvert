@@ -357,6 +357,27 @@ func TestParseClassicalAlbumMetadataParsesColonAlbumContext(t *testing.T) {
 	}
 }
 
+func TestParseClassicalAlbumMetadataCleansNumberedHyphenContext(t *testing.T) {
+	got := parseClassicalAlbumMetadata("9贝多芬- 小提琴奏鸣曲全集-谢林,海布勒")
+	if got.Composer != "贝多芬" || got.Work != "小提琴奏鸣曲全集" {
+		t.Fatalf("Composer/Work = %q/%q, want 贝多芬/小提琴奏鸣曲全集", got.Composer, got.Work)
+	}
+	if artist := normalizeArtistName("7_维瓦尔第"); artist != "维瓦尔第" {
+		t.Fatalf("normalizeArtistName() = %q, want 维瓦尔第", artist)
+	}
+	if album := normalizeAlbumName("12首小提琴协奏曲和谐的灵感Op3"); album != "12首小提琴协奏曲和谐的灵感Op3" {
+		t.Fatalf("normalizeAlbumName() = %q", album)
+	}
+}
+
+func TestNormalizeAlbumNameCleansClassicalPunctuationAndRareGlyph(t *testing.T) {
+	got := normalizeAlbumName("舒伯特：- 𫚭鱼")
+	want := "舒伯特: 鳟鱼"
+	if got != want {
+		t.Fatalf("normalizeAlbumName() = %q, want %q", got, want)
+	}
+}
+
 func TestParseClassicalAlbumMetadataDoesNotLetCatalogPolluteComposer(t *testing.T) {
 	got := parseClassicalAlbumMetadata("phcp-24003史特拉汶斯基「火鴅」。戴緎斯指揮阿姆斯丹大會堂管弦樂坒。")
 	if got.Catalog != "PHCP-24003" {
