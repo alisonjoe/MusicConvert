@@ -1,15 +1,42 @@
-# Binaries for programs and plugins
+# 编译产物
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
+MusicConvert
+musicConvert
+music-convert
+MusicConvert_synology*
 
-# Test binary, built with `go test -c`
+# Go 构建
+/bin/
+/dist/
+
+# 测试
 *.test
-
-# Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+tmp/
+temp/
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
+# macOS
+.DS_Store
+**/.DS_Store
+
+# 编辑器
+.idea/
+.vscode/
+*.swp
+*~
+
+# 本地配置
+config.local.yaml
+.env
+
+# 数据库
+*.db
+*.db-shm
+*.db-wal
+
+# 日志
+*.log

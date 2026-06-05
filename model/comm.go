@@ -19,6 +19,8 @@ var NeedConvertSuffix = map[string]struct{}{
 	".APE":  {},
 	".WAV":  {},
 	".CUE":  {},
+	".MP3":  {},
+	".M4A":  {},
 }
 
 type SwitchState int

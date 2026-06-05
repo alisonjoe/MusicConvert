@@ -13,13 +13,13 @@ func GetTotalNum(ctx context.Context, cue string) (int, error) {
 	args := []string{"-n", "1", "-t", "%N", cue}
 	str, err := util.Run(ctx, "cueprint", args)
 	if err != nil {
-		log.Fatalf("cmd2 run fail: %v\n", str)
+		log.Printf("GetTotalNum cmd run fail: %v, err: %v", str, err)
 		return 0, err
 	}
 
 	i, err := strconv.Atoi(str)
 	if err != nil {
-		log.Fatalf("cmd2 run fail: %v\n", str)
+		log.Printf("GetTotalNum Atoi fail: %v, err: %v", str, err)
 		return 0, err
 	}
 	return i, nil
@@ -30,7 +30,7 @@ func GetTrackTitle(ctx context.Context, num int, cue string) (string, error) {
 	args := []string{"-n", fmt.Sprintf("%d", num), "-t", "%t", cue}
 	str, err := util.Run(ctx, "cueprint", args)
 	if err != nil {
-		log.Fatalf("cmd2 run fail: %v\n", str)
+		log.Printf("GetTrackTitle cmd run fail: %v, err: %v", str, err)
 		return "", err
 	}
 
