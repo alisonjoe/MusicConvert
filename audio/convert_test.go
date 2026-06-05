@@ -121,6 +121,26 @@ func TestVinylDiscDirectoryParsing(t *testing.T) {
 	}
 }
 
+func TestCatalogDirectoryParsing(t *testing.T) {
+	dir := t.TempDir()
+	albumDir := filepath.Join(dir, "贝多芬：小提琴奏鸣曲全集-谢林,海布勒")
+	for _, name := range []string{"PHCP-24028", "PHCP-24029"} {
+		if err := os.MkdirAll(filepath.Join(albumDir, name), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	path := filepath.Join(albumDir, "PHCP-24029", "Track01.wav")
+	if got, want := sourceAlbumDirName(path), "贝多芬：小提琴奏鸣曲全集-谢林,海布勒"; got != want {
+		t.Fatalf("sourceAlbumDirName() = %q, want %q", got, want)
+	}
+	if got, want := discNumberFromSource(&AutoMetadata{}, path), 2; got != want {
+		t.Fatalf("discNumberFromSource() = %d, want %d", got, want)
+	}
+	if got, want := sourceDiscCount(path), 2; got != want {
+		t.Fatalf("sourceDiscCount() = %d, want %d", got, want)
+	}
+}
+
 func TestFirstYearIgnoresNonDigits(t *testing.T) {
 	if got := firstYear("12 Vinyl 02"); got != "" {
 		t.Fatalf("firstYear() = %q, want empty", got)
@@ -361,6 +381,10 @@ func TestParseClassicalAlbumMetadataCleansNumberedHyphenContext(t *testing.T) {
 	got := parseClassicalAlbumMetadata("9贝多芬- 小提琴奏鸣曲全集-谢林,海布勒")
 	if got.Composer != "贝多芬" || got.Work != "小提琴奏鸣曲全集" {
 		t.Fatalf("Composer/Work = %q/%q, want 贝多芬/小提琴奏鸣曲全集", got.Composer, got.Work)
+	}
+	got = parseClassicalAlbumMetadata("PHCP-24028 贝多芬：小提琴奏鸣曲全集-谢林,海布勒")
+	if got.Catalog != "PHCP-24028" || got.Composer != "贝多芬" || got.Work != "小提琴奏鸣曲全集" {
+		t.Fatalf("Catalog/Composer/Work = %q/%q/%q", got.Catalog, got.Composer, got.Work)
 	}
 	if artist := normalizeArtistName("7_维瓦尔第"); artist != "维瓦尔第" {
 		t.Fatalf("normalizeArtistName() = %q, want 维瓦尔第", artist)

@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -225,9 +226,17 @@ func isDiscDir(name string) bool {
 	return discNumberFromName(name) > 0
 }
 
+func isCatalogOnlyDir(name string) bool {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return false
+	}
+	return strings.TrimSpace(catalogPrefixPattern.ReplaceAllString(name, "")) == ""
+}
+
 func sourceAlbumDirName(filePath string) string {
 	parent := filepath.Base(filepath.Dir(filePath))
-	if isDiscDir(parent) {
+	if isDiscDir(parent) || isCatalogOnlyDir(parent) {
 		grandParent := filepath.Base(filepath.Dir(filepath.Dir(filePath)))
 		if grandParent != "." && grandParent != string(os.PathSeparator) {
 			return grandParent
@@ -236,13 +245,46 @@ func sourceAlbumDirName(filePath string) string {
 	return parent
 }
 
+func catalogSiblingDirs(filePath string) []string {
+	parent := filepath.Base(filepath.Dir(filePath))
+	if !isCatalogOnlyDir(parent) {
+		return nil
+	}
+	albumDir := filepath.Dir(filepath.Dir(filePath))
+	entries, err := os.ReadDir(albumDir)
+	if err != nil {
+		return nil
+	}
+	var dirs []string
+	for _, entry := range entries {
+		if entry.IsDir() && isCatalogOnlyDir(entry.Name()) {
+			dirs = append(dirs, entry.Name())
+		}
+	}
+	sort.Strings(dirs)
+	return dirs
+}
+
+func catalogDiscNumberFromSource(filePath string) int {
+	parent := filepath.Base(filepath.Dir(filePath))
+	for i, dir := range catalogSiblingDirs(filePath) {
+		if dir == parent {
+			return i + 1
+		}
+	}
+	return 0
+}
+
 func discNumberFromSource(meta *AutoMetadata, filePath string) int {
 	for _, key := range []string{"DISCNUMBER", "DISC", "disc"} {
 		if n := parseDiscNumberTag(meta.GetTag(key)); n > 0 {
 			return n
 		}
 	}
-	if n := discNumberFromName(filepath.Base(filepath.Dir(filePath))); n > 0 {
+	if n := parseDiscNumberTag(filepath.Base(filepath.Dir(filePath))); n > 0 && !isCatalogOnlyDir(filepath.Base(filepath.Dir(filePath))) {
+		return n
+	}
+	if n := catalogDiscNumberFromSource(filePath); n > 0 {
 		return n
 	}
 	return 1
@@ -250,6 +292,12 @@ func discNumberFromSource(meta *AutoMetadata, filePath string) int {
 
 func sourceDiscCount(filePath string) int {
 	parent := filepath.Base(filepath.Dir(filePath))
+	if isCatalogOnlyDir(parent) {
+		if dirs := catalogSiblingDirs(filePath); len(dirs) > 0 {
+			return len(dirs)
+		}
+		return 1
+	}
 	if !isDiscDir(parent) {
 		return 1
 	}
@@ -761,6 +809,16 @@ func normalizeClassicalAlbumText(album string) string {
 	return album
 }
 
+func looksLikeClassicalWork(s string) bool {
+	s = strings.ToLower(strings.TrimSpace(s))
+	for _, term := range []string{"协奏曲", "奏鸣曲", "交响曲", "五重奏", "四重奏", "三重奏", "concerto", "sonata", "symphony", "quintet", "quartet", "trio"} {
+		if strings.Contains(s, term) {
+			return true
+		}
+	}
+	return false
+}
+
 func parseClassicalAlbumMetadata(album string) classicalMetadata {
 	album = normalizeClassicalAlbumText(album)
 	var meta classicalMetadata
@@ -791,6 +849,9 @@ func parseClassicalAlbumMetadata(album string) classicalMetadata {
 	}
 	meta.Composer = cleanClassicalNameNoise(meta.Composer)
 	meta.Work = cleanClassicalNameNoise(meta.Work)
+	if idx := strings.Index(meta.Work, "-"); idx > 0 && looksLikeClassicalWork(meta.Work[:idx]) {
+		meta.Work = strings.TrimSpace(meta.Work[:idx])
+	}
 	if strings.Contains(meta.Work, "鳟鱼") && strings.Contains(album, "钢琴五重奏") {
 		meta.Work = "鳟鱼钢琴五重奏"
 	}
@@ -1437,6 +1498,9 @@ func singleConvert(ctx context.Context, st model.MusicFileInfo, outRoot string) 
 
 	// 清理并规范化专辑提示
 	albumHint := api.CleanHint(origAlbum)
+	if isCatalogOnlyDir(albumHint) && sourceAlbumDir != "" {
+		albumHint = strings.TrimSpace(albumHint + " " + api.CleanHint(sourceAlbumDir))
+	}
 	if albumHint == "" || albumHint == "Unknown Album" {
 		albumHint = api.CleanHint(sourceAlbumDir)
 	}
