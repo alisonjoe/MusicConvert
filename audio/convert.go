@@ -720,7 +720,10 @@ func albumArtistFromAlbumTitle(album string) string {
 }
 
 func normalizeClassicalAlbumText(album string) string {
-	return util.ToSimplifiedChinese(normalizeAlbumName(album))
+	album = util.ToSimplifiedChinese(normalizeAlbumName(album))
+	album = strings.ReplaceAll(album, "鴅", "鸟")
+	album = strings.ReplaceAll(album, "𫛝", "鸟")
+	return album
 }
 
 func parseClassicalAlbumMetadata(album string) classicalMetadata {
@@ -1096,9 +1099,51 @@ func fetchDiscogsMetaForClassical(classicalMeta classicalMetadata) (api.DiscogsR
 	return api.FetchDiscogsReleaseMeta(classicalMeta.Catalog, classicalMeta.SearchHints())
 }
 
+func localizedClassicalTrackTitles(classicalMeta classicalMetadata) map[int]string {
+	workAlias := classicalAlias(classicalMeta.Work)
+	if workAlias == "" {
+		workAlias = classicalAlias(classicalMeta.AlbumName(""))
+	}
+	if workAlias != "The Firebird" {
+		return nil
+	}
+	titles := []string{
+		"引子",
+		"第1场: 卡斯切伊的魔法花园",
+		"第1场: 火鸟出现，伊凡王子追捕火鸟",
+		"第1场: 火鸟之舞",
+		"第1场: 伊凡王子捕获火鸟",
+		"第1场: 火鸟的恳求",
+		"第1场: 十三位魔法公主出现",
+		"第1场: 公主们玩金苹果",
+		"第1场: 伊凡王子突然出现",
+		"第1场: 公主们的霍罗沃德圆舞",
+		"第1场: 破晓",
+		"第1场: 魔钟，卡斯切伊的怪物守卫出现，伊凡王子被捕",
+		"第1场: 不死魔王卡斯切伊到来",
+		"第1场: 卡斯切伊与伊凡王子的对话",
+		"第1场: 公主们的求情",
+		"第1场: 火鸟出现",
+		"第1场: 被火鸟施魔法的卡斯切伊随从之舞",
+		"第1场: 卡斯切伊臣民的地狱之舞",
+		"第1场: 摇篮曲（火鸟）",
+		"第1场: 卡斯切伊醒来",
+		"第1场: 卡斯切伊之死；深沉的黑暗",
+		"第2场: 卡斯切伊宫殿与魔法造物消失，石化骑士复活，大团圆",
+	}
+	tracks := make(map[int]string, len(titles))
+	for i, title := range titles {
+		tracks[i+1] = title
+	}
+	return tracks
+}
+
 func albumTrackTitlesForConversion(filePath, artist, album string, classicalMeta classicalMetadata) (map[int]string, string) {
 	if sourceTracks := sourceDiscTrackTitles(filePath); len(sourceTracks) > 0 {
 		return sourceTracks, "source_dir"
+	}
+	if tracks := localizedClassicalTrackTitles(classicalMeta); len(tracks) > 0 {
+		return tracks, "classical_localized"
 	}
 	if classicalMeta.IsClassical() && hasChineseClassicalContext(classicalMeta) {
 		if tracks, source := api.GetAlbumTrackTitlesWithSource(artist, album); len(tracks) > 0 {
@@ -1453,10 +1498,13 @@ PROCESS_PATH:
 	util.MkPathIfNotExists(basePath)
 	var trackTitles map[int]string
 	trackTitleSource := ""
-	if len(discogsMeta.Tracks) > 0 {
+	if len(discogsMeta.Tracks) > 0 && !hasChineseClassicalContext(classicalMeta) {
 		trackTitles, trackTitleSource = discogsMeta.Tracks, discogsSource
 	} else {
 		trackTitles, trackTitleSource = albumTrackTitlesForConversion(st.FilePath, finalMainArtist, officialAlbum, classicalMeta)
+		if len(trackTitles) == 0 && len(discogsMeta.Tracks) > 0 {
+			trackTitles, trackTitleSource = discogsMeta.Tracks, discogsSource
+		}
 	}
 	resolvedTitle := titleFromOnlineTrack(trackNum, officialTitle, trackTitles, classicalMeta)
 	if resolvedTitle != officialTitle {

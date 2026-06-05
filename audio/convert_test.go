@@ -336,6 +336,9 @@ func TestParseClassicalAlbumMetadataDoesNotLetCatalogPolluteComposer(t *testing.
 	if strings.Contains(strings.ToLower(got.Composer), "phcp") {
 		t.Fatalf("Composer = %q, should not contain catalog", got.Composer)
 	}
+	if got.Work != "火鸟" {
+		t.Fatalf("Work = %q, want 火鸟", got.Work)
+	}
 }
 
 func TestEnrichClassicalMetadataFromDiscogsRelease(t *testing.T) {
@@ -345,8 +348,8 @@ func TestEnrichClassicalMetadataFromDiscogsRelease(t *testing.T) {
 		Title:   "L'Oiseau De Feu (Complete Original Version)",
 		Credits: []api.DiscogsCredit{{Name: "Colin Davis", Role: "Conductor"}, {Name: "Royal Concertgebouw Orchestra", Role: "Orchestra"}},
 	})
-	if got.Work != "L'Oiseau De Feu" {
-		t.Fatalf("Work = %q, want L'Oiseau De Feu", got.Work)
+	if got.Work != "火鸟" {
+		t.Fatalf("Work = %q, want 火鸟", got.Work)
 	}
 	if got.Conductor != "Colin Davis" || got.Ensemble != "Royal Concertgebouw Orchestra" {
 		t.Fatalf("Conductor/Ensemble = %q/%q, want Discogs credits", got.Conductor, got.Ensemble)
@@ -354,7 +357,7 @@ func TestEnrichClassicalMetadataFromDiscogsRelease(t *testing.T) {
 	if strings.Contains(got.Performer, "戴緎斯") {
 		t.Fatalf("Performer = %q, should not keep dirty local conductor", got.Performer)
 	}
-	if got.AlbumName("fallback") != "史特拉汶斯基: L'Oiseau De Feu" {
+	if got.AlbumName("fallback") != "史特拉汶斯基: 火鸟" {
 		t.Fatalf("AlbumName() = %q", got.AlbumName("fallback"))
 	}
 }
@@ -411,6 +414,17 @@ func TestTitleFromOnlineTrackBuildsBilingualClassicalTitle(t *testing.T) {
 	want := "第1场: 火鸟-Dance Of The Firebird"
 	if got != want {
 		t.Fatalf("titleFromOnlineTrack() = %q, want %q", got, want)
+	}
+}
+
+func TestLocalizedClassicalTrackTitlesForFirebird(t *testing.T) {
+	meta := parseClassicalAlbumMetadata("PHCP-24003史特拉汶斯基「火鴅」。戴維斯指揮阿姆斯丹大會堂管弦樂團。")
+	got := localizedClassicalTrackTitles(meta)
+	if len(got) != 22 {
+		t.Fatalf("localizedClassicalTrackTitles() len = %d, want 22", len(got))
+	}
+	if got[1] != "引子" || got[4] != "第1场: 火鸟之舞" || got[22] == "" {
+		t.Fatalf("localizedClassicalTrackTitles() = %#v", got)
 	}
 }
 
