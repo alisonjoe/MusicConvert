@@ -376,6 +376,34 @@ func TestNormalizeAlbumNameCleansClassicalPunctuationAndRareGlyph(t *testing.T) 
 	if got != want {
 		t.Fatalf("normalizeAlbumName() = %q, want %q", got, want)
 	}
+	if got := normalizeAlbumName("鱲魚"); got != "鳟鱼" {
+		t.Fatalf("normalizeAlbumName(鱲魚) = %q, want 鳟鱼", got)
+	}
+}
+
+func TestParseClassicalAlbumMetadataParsesTroutChamberAlbum(t *testing.T) {
+	got := parseClassicalAlbumMetadata("phcp-24010舒伯特：「鱲魚」鋼琴五重奏。布蘭德爾鋼琴，克里夫蘭弦樂四重奏。")
+	if got.Composer != "舒伯特" || got.Work != "鳟鱼钢琴五重奏" {
+		t.Fatalf("Composer/Work = %q/%q, want 舒伯特/鳟鱼钢琴五重奏", got.Composer, got.Work)
+	}
+	if got.Conductor != "" {
+		t.Fatalf("Conductor = %q, want empty for chamber album", got.Conductor)
+	}
+	if got.Ensemble != "克里夫兰弦乐四重奏" || got.Performer != "布兰德尔" || got.Instrument != "钢琴" {
+		t.Fatalf("Ensemble/Performer/Instrument = %q/%q/%q", got.Ensemble, got.Performer, got.Instrument)
+	}
+}
+
+func TestEnrichClassicalMetadataFromDiscogsDoesNotUseComposerAsConductor(t *testing.T) {
+	meta := parseClassicalAlbumMetadata("phcp-24010舒伯特：「鱲魚」鋼琴五重奏。布蘭德爾鋼琴，克里夫蘭弦樂四重奏。")
+	got := enrichClassicalMetadataFromDiscogs(meta, api.DiscogsReleaseMeta{
+		ID:      35096795,
+		Title:   "Piano Quintet, Op.114 \"Trout\"",
+		Artists: []string{"Franz Schubert"},
+	})
+	if got.Conductor != "" {
+		t.Fatalf("Conductor = %q, want empty", got.Conductor)
+	}
 }
 
 func TestParseClassicalAlbumMetadataDoesNotLetCatalogPolluteComposer(t *testing.T) {

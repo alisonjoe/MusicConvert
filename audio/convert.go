@@ -27,7 +27,8 @@ var (
 	colonClassicalPattern    = regexp.MustCompile(`^\s*(?i:[A-Z]{2,}[-_ ]?\d+)?\s*([^:：。「」]+)[:：]\s*([^。]+)`)
 	hyphenClassicalPattern   = regexp.MustCompile(`^\s*(?i:[A-Z]{2,}[-_ ]?\d+)?\s*([\p{Han}A-Za-z][^-。]+)-\s*([^。]+?(?:协奏曲|奏鸣曲|交响曲|五重奏|四重奏|三重奏|Concerto|Sonata|Symphony|Quintet|Quartet|Trio)[^。]*)`)
 	conductorEnsemblePattern = regexp.MustCompile(`([^。；;，,]+?)指挥([^。；;，,]+?(?:大?会堂管弦乐团|管弦乐团|交响乐团|音乐厅管弦乐团|樂團|乐团|交響樂團))`)
-	instrumentalistPattern   = regexp.MustCompile(`([^。；;，,]+?)(钢琴|小提琴|大提琴|吉他|古筝|琵琶|长笛|单簧管|双簧管|萨克斯|竖琴|风琴|管风琴)`)
+	chamberEnsemblePattern   = regexp.MustCompile(`([^。；;，,]+?(?:弦乐四重奏|弦樂四重奏|四重奏团|四重奏團|三重奏团|三重奏團|五重奏团|五重奏團|Quartet|Trio|Quintet))`)
+	instrumentalistPattern   = regexp.MustCompile(`(?:^|[。；;，,])([^。；;，,「」]+?)(钢琴|小提琴|大提琴|吉他|古筝|琵琶|长笛|单簧管|双簧管|萨克斯|竖琴|风琴|管风琴)`)
 )
 
 type classicalMetadata struct {
@@ -644,7 +645,7 @@ func cleanClassicalNameNoise(s string) string {
 	if i > 0 && j < len(runes) && runes[j] >= 0x4e00 && runes[j] <= 0x9fff && runes[j] != '首' {
 		s = strings.TrimSpace(string(runes[j:]))
 	}
-	s = strings.TrimRight(s, ":：")
+	s = strings.Trim(s, " :：")
 	return s
 }
 
@@ -661,8 +662,11 @@ func normalizeAlbumName(album string) string {
 		"“", "\"",
 		"”", "\"",
 		"𫚭", "鳟",
+		"鱲", "鳟",
 	)
 	album = util.ToSimplifiedChinese(strings.TrimSpace(replacer.Replace(album)))
+	album = strings.ReplaceAll(album, "𫚭", "鳟")
+	album = strings.ReplaceAll(album, "鱲", "鳟")
 	album = cleanClassicalNameNoise(album)
 	album = strings.ReplaceAll(album, ":-", ": ")
 	album = strings.ReplaceAll(album, ": -", ": ")
@@ -752,6 +756,8 @@ func normalizeClassicalAlbumText(album string) string {
 	album = util.ToSimplifiedChinese(normalizeAlbumName(album))
 	album = strings.ReplaceAll(album, "鴅", "鸟")
 	album = strings.ReplaceAll(album, "𫛝", "鸟")
+	album = strings.ReplaceAll(album, "鱲", "鳟")
+	album = strings.ReplaceAll(album, "𫚭", "鳟")
 	return album
 }
 
@@ -785,19 +791,24 @@ func parseClassicalAlbumMetadata(album string) classicalMetadata {
 	}
 	meta.Composer = cleanClassicalNameNoise(meta.Composer)
 	meta.Work = cleanClassicalNameNoise(meta.Work)
+	if strings.Contains(meta.Work, "鳟鱼") && strings.Contains(album, "钢琴五重奏") {
+		meta.Work = "鳟鱼钢琴五重奏"
+	}
 	if matches := conductorEnsemblePattern.FindStringSubmatch(album); len(matches) >= 3 {
 		meta.Conductor = strings.TrimSpace(matches[1])
 		meta.Ensemble = strings.TrimSpace(matches[2])
 		meta.Performer = strings.TrimSpace(meta.Conductor + "指挥" + meta.Ensemble)
 	}
 	if meta.Ensemble == "" {
-		if candidate := orchestraCandidateFromText(album); candidate != "" {
+		if matches := chamberEnsemblePattern.FindStringSubmatch(album); len(matches) >= 2 {
+			meta.Ensemble = strings.TrimSpace(matches[1])
+		} else if candidate := orchestraCandidateFromText(album); candidate != "" {
 			meta.Ensemble = candidate
 		}
 	}
 	if meta.Performer == "" {
 		if matches := instrumentalistPattern.FindStringSubmatch(album); len(matches) >= 3 {
-			meta.Performer = strings.TrimSpace(matches[1])
+			meta.Performer = cleanClassicalNameNoise(matches[1])
 			meta.Instrument = strings.TrimSpace(matches[2])
 		}
 	}
@@ -1043,13 +1054,9 @@ func enrichClassicalMetadataFromDiscogs(meta classicalMetadata, release api.Disc
 		}
 	}
 	for _, artist := range release.Artists {
-		if discogsConductor == "" {
-			if name := strings.TrimSpace(normalizeArtistName(artist)); name != "" && !strings.Contains(strings.ToLower(artist), "orchestra") {
-				discogsConductor = name
-			}
-		}
 		if discogsEnsemble == "" {
-			if name := strings.TrimSpace(normalizeArtistName(artist)); name != "" && strings.Contains(strings.ToLower(artist), "orchestra") {
+			lowerArtist := strings.ToLower(artist)
+			if name := strings.TrimSpace(normalizeArtistName(artist)); name != "" && (strings.Contains(lowerArtist, "orchestra") || strings.Contains(lowerArtist, "quartet") || strings.Contains(lowerArtist, "trio") || strings.Contains(lowerArtist, "quintet")) {
 				discogsEnsemble = name
 			}
 		}
