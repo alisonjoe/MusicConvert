@@ -426,11 +426,11 @@ func TestApplyClassicalMetadataTags(t *testing.T) {
 	}
 }
 
-func TestTitleFromOnlineTrackUsesChineseOriginalForClassicalGenericTitle(t *testing.T) {
+func TestTitleFromOnlineTrackPrefixesChineseWorkForClassicalGenericTitle(t *testing.T) {
 	meta := parseClassicalAlbumMetadata("PHCP-24002史特拉汶斯基「春之祭」。戴維斯指揮阿姆斯丹堂管弦樂團。")
 	tracks := map[int]string{8: "The Rite of Spring: Part II. The Sacrifice"}
 	got := titleFromOnlineTrack(8, "Track08", tracks, meta)
-	want := "The Rite of Spring: Part II. The Sacrifice"
+	want := "春之祭-The Rite of Spring: Part II. The Sacrifice"
 	if got != want {
 		t.Fatalf("titleFromOnlineTrack() = %q, want %q", got, want)
 	}

@@ -1093,6 +1093,9 @@ func titleFromOnlineTrack(trackNum int, currentTitle string, trackTitles map[int
 	}
 	if classicalMeta.IsClassical() {
 		if currentTitle == "" || looksLikeGenericTrackTitle(currentTitle) {
+			if !api.ContainsChinese(onlineTitle) && api.ContainsChinese(classicalMeta.Work) {
+				return combinedLocalizedTitle(classicalMeta.Work, onlineTitle)
+			}
 			return onlineTitle
 		}
 		currentHasChinese := api.ContainsChinese(currentTitle)
