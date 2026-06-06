@@ -1038,12 +1038,38 @@ func classicalWorkFromDiscogsTitle(title string) string {
 
 func classicalComposerFromDiscogsArtists(artists []string) string {
 	for _, artist := range artists {
-		name := strings.TrimSpace(normalizeArtistName(artist))
+		name := strings.TrimSpace(localizedArtistName(artist))
 		if name != "" {
 			return name
 		}
 	}
 	return ""
+}
+
+func localizedClassicalWorkName(work string) string {
+	work = normalizeAlbumName(work)
+	if work == "" || api.ContainsChinese(work) {
+		return work
+	}
+	lower := strings.ToLower(work)
+	if strings.Contains(lower, "sonata") && strings.Contains(lower, "violin") && strings.Contains(lower, "piano") {
+		return combinedLocalizedTitle("小提琴奏鸣曲全集", work)
+	}
+	return work
+}
+
+func chineseClassicalWorkPrefix(work string) string {
+	work = normalizeAlbumName(work)
+	if !api.ContainsChinese(work) {
+		return ""
+	}
+	if idx := strings.Index(work, "-"); idx > 0 {
+		prefix := strings.TrimSpace(work[:idx])
+		if api.ContainsChinese(prefix) {
+			return prefix
+		}
+	}
+	return work
 }
 
 func localizedArtistName(name string) string {
@@ -1180,7 +1206,7 @@ func enrichClassicalMetadataFromDiscogs(meta classicalMetadata, release api.Disc
 		return meta
 	}
 	if work := classicalWorkFromDiscogsTitle(release.Title); work != "" {
-		meta.Work = preferLocalClassicalText(meta.Work, work)
+		meta.Work = preferLocalClassicalText(meta.Work, localizedClassicalWorkName(work))
 	}
 	if composer := classicalComposerFromDiscogsArtists(release.Artists); composer != "" {
 		meta.Composer = preferLocalClassicalText(meta.Composer, composer)
@@ -1287,7 +1313,7 @@ func containsKana(s string) bool {
 }
 
 func shouldPrefixChineseWork(classicalMeta classicalMetadata, title string) bool {
-	if !api.ContainsChinese(classicalMeta.Work) {
+	if chineseClassicalWorkPrefix(classicalMeta.Work) == "" {
 		return false
 	}
 	if !api.ContainsChinese(title) || containsKana(title) {
@@ -1306,7 +1332,7 @@ func titleFromOnlineTrack(trackNum int, currentTitle string, trackTitles map[int
 	if classicalMeta.IsClassical() {
 		if currentTitle == "" || looksLikeGenericTrackTitle(currentTitle) {
 			if shouldPrefixChineseWork(classicalMeta, onlineTitle) {
-				return combinedLocalizedTitle(classicalMeta.Work, onlineTitle)
+				return combinedLocalizedTitle(chineseClassicalWorkPrefix(classicalMeta.Work), onlineTitle)
 			}
 			return onlineTitle
 		}

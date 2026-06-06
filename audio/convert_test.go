@@ -527,6 +527,18 @@ func TestEnrichClassicalMetadataFromDiscogsKeepsValidChineseAlbum(t *testing.T) 
 	}
 }
 
+func TestEnrichClassicalMetadataFromDiscogsAddsChineseWorkPrefix(t *testing.T) {
+	meta := classicalMetadata{Catalog: "PHCP-24026"}
+	got := enrichClassicalMetadataFromDiscogs(meta, api.DiscogsReleaseMeta{
+		ID:      12305820,
+		Title:   "The Sonatas For Piano And Violin = Die Sonaten Für Klavier Und Violine",
+		Artists: []string{"Ludwig van Beethoven"},
+	})
+	if !strings.Contains(got.Composer, "贝多芬") || !strings.HasPrefix(got.Work, "小提琴奏鸣曲全集-") {
+		t.Fatalf("Composer/Work = %q/%q, want bilingual classical metadata", got.Composer, got.Work)
+	}
+}
+
 func TestApplyClassicalMetadataTags(t *testing.T) {
 	meta := parseClassicalAlbumMetadata("PHCP-24002史特拉汶斯基「春之祭」。戴維斯指揮阿姆斯丹堂管弦樂團。")
 	tags := map[string]string{}
