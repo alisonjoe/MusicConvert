@@ -419,6 +419,9 @@ func TestParseClassicalAlbumMetadataParsesColonAlbumContext(t *testing.T) {
 	if got.Conductor != "阿巴多" || got.Ensemble != "伦郭交响乐团" {
 		t.Fatalf("Conductor/Ensemble = %q/%q", got.Conductor, got.Ensemble)
 	}
+	if got.AlbumName("fallback") != "舒曼: 钢琴协奏曲 - 布兰德尔, 阿巴多" {
+		t.Fatalf("AlbumName() = %q", got.AlbumName("fallback"))
+	}
 }
 
 func TestParseClassicalAlbumMetadataCleansNumberedHyphenContext(t *testing.T) {
@@ -429,6 +432,9 @@ func TestParseClassicalAlbumMetadataCleansNumberedHyphenContext(t *testing.T) {
 	got = parseClassicalAlbumMetadata("PHCP-24028 贝多芬：小提琴奏鸣曲全集-谢林,海布勒")
 	if got.Catalog != "PHCP-24028" || got.Composer != "贝多芬" || got.Work != "小提琴奏鸣曲全集" || got.Performer != "谢林,海布勒" {
 		t.Fatalf("Catalog/Composer/Work/Performer = %q/%q/%q/%q", got.Catalog, got.Composer, got.Work, got.Performer)
+	}
+	if got.AlbumName("fallback") != "贝多芬: 小提琴奏鸣曲全集 - 谢林, 海布勒" {
+		t.Fatalf("AlbumName() = %q", got.AlbumName("fallback"))
 	}
 	if artist := normalizeArtistName("7_维瓦尔第"); artist != "维瓦尔第" {
 		t.Fatalf("normalizeArtistName() = %q, want 维瓦尔第", artist)

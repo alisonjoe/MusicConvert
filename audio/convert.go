@@ -19,19 +19,20 @@ import (
 )
 
 var (
-	cueDiscSuffixPattern     = regexp.MustCompile(`(?i)\s*[\[\(]\s*(?:disc|disk|cd)\s*0*([0-9]+)\s*[\]\)]\s*$`)
-	bootlegVolumePattern     = regexp.MustCompile(`(?i)\b(?:vol(?:ume)?s?\.?|volumes?)\s*([0-9]+)(?:\s*[-–—]\s*([0-9]+))?`)
-	bootlegSeriesTitleWords  = regexp.MustCompile(`(?i)\bbootleg\b.*\bseries\b`)
-	genericTrackTitlePattern = regexp.MustCompile(`(?i)^track\s*0*([0-9]+)$`)
-	catalogPrefixPattern     = regexp.MustCompile(`(?i)^\s*([A-Z]{2,}[-_ ]?\d+)\s*`)
-	catalogNumberPattern     = regexp.MustCompile(`(?i)^([A-Z]{2,}[-_ ]?)(\d+)$`)
-	numeroNoSpacePattern     = regexp.MustCompile(`\bNo\.\s*([0-9]+)`)
-	quotedClassicalPattern   = regexp.MustCompile(`^\s*(?i:[A-Z]{2,}[-_ ]?\d+)?\s*([^「」『』《》]+)[「『《]([^」』》]+)[」』》]`)
-	colonClassicalPattern    = regexp.MustCompile(`^\s*(?i:[A-Z]{2,}[-_ ]?\d+)?\s*([^:：。「」]+)[:：]\s*([^。]+)`)
-	hyphenClassicalPattern   = regexp.MustCompile(`^\s*(?i:[A-Z]{2,}[-_ ]?\d+)?\s*([\p{Han}A-Za-z][^-。]+)-\s*([^。]+?(?:协奏曲|奏鸣曲|交响曲|五重奏|四重奏|三重奏|Concerto|Sonata|Symphony|Quintet|Quartet|Trio)[^。]*)`)
-	conductorEnsemblePattern = regexp.MustCompile(`([^。；;，,]+?)指挥([^。；;，,]+?(?:大?会堂管弦乐团|管弦乐团|交响乐团|音乐厅管弦乐团|樂團|乐团|交響樂團))`)
-	chamberEnsemblePattern   = regexp.MustCompile(`([^。；;，,]+?(?:弦乐四重奏|弦樂四重奏|四重奏团|四重奏團|三重奏团|三重奏團|五重奏团|五重奏團|Quartet|Trio|Quintet))`)
-	instrumentalistPattern   = regexp.MustCompile(`(?:^|[。；;，,])([^。；;，,「」]+?)(钢琴|小提琴|大提琴|吉他|古筝|琵琶|长笛|单簧管|双簧管|萨克斯|竖琴|风琴|管风琴)`)
+	cueDiscSuffixPattern               = regexp.MustCompile(`(?i)\s*[\[\(]\s*(?:disc|disk|cd)\s*0*([0-9]+)\s*[\]\)]\s*$`)
+	bootlegVolumePattern               = regexp.MustCompile(`(?i)\b(?:vol(?:ume)?s?\.?|volumes?)\s*([0-9]+)(?:\s*[-–—]\s*([0-9]+))?`)
+	bootlegSeriesTitleWords            = regexp.MustCompile(`(?i)\bbootleg\b.*\bseries\b`)
+	genericTrackTitlePattern           = regexp.MustCompile(`(?i)^track\s*0*([0-9]+)$`)
+	catalogPrefixPattern               = regexp.MustCompile(`(?i)^\s*([A-Z]{2,}[-_ ]?\d+)\s*`)
+	catalogNumberPattern               = regexp.MustCompile(`(?i)^([A-Z]{2,}[-_ ]?)(\d+)$`)
+	numeroNoSpacePattern               = regexp.MustCompile(`\bNo\.\s*([0-9]+)`)
+	quotedClassicalPattern             = regexp.MustCompile(`^\s*(?i:[A-Z]{2,}[-_ ]?\d+)?\s*([^「」『』《》]+)[「『《]([^」』》]+)[」』》]`)
+	colonClassicalPattern              = regexp.MustCompile(`^\s*(?i:[A-Z]{2,}[-_ ]?\d+)?\s*([^:：。「」]+)[:：]\s*([^。]+)`)
+	hyphenClassicalPattern             = regexp.MustCompile(`^\s*(?i:[A-Z]{2,}[-_ ]?\d+)?\s*([\p{Han}A-Za-z][^-。]+)-\s*([^。]+?(?:协奏曲|奏鸣曲|交响曲|五重奏|四重奏|三重奏|Concerto|Sonata|Symphony|Quintet|Quartet|Trio)[^。]*)`)
+	conductorEnsemblePattern           = regexp.MustCompile(`([^。；;，,]+?)指挥([^。；;，,]+?(?:大?会堂管弦乐团|管弦乐团|交响乐团|音乐厅管弦乐团|樂團|乐团|交響樂團))`)
+	chamberEnsemblePattern             = regexp.MustCompile(`([^。；;，,]+?(?:弦乐四重奏|弦樂四重奏|四重奏团|四重奏團|三重奏团|三重奏團|五重奏团|五重奏團|Quartet|Trio|Quintet))`)
+	instrumentalistPattern             = regexp.MustCompile(`(?:^|[。；;，,])([^。；;，,「」]+?)(钢琴|小提琴|大提琴|吉他|古筝|琵琶|长笛|单簧管|双簧管|萨克斯|竖琴|风琴|管风琴)`)
+	instrumentalistAfterPunctuationPat = regexp.MustCompile(`[。；;，,]([^。；;，,「」]+?)(钢琴|小提琴|大提琴|吉他|古筝|琵琶|长笛|单簧管|双簧管|萨克斯|竖琴|风琴|管风琴)`)
 )
 
 type classicalMetadata struct {
@@ -946,13 +947,20 @@ func parseClassicalAlbumMetadata(album string) classicalMetadata {
 			meta.Ensemble = candidate
 		}
 	}
-	if meta.Performer == "" {
-		if matches := instrumentalistPattern.FindStringSubmatch(album); len(matches) >= 3 {
-			performer := cleanClassicalNameNoise(matches[1])
-			if performer != "" && performer != meta.Composer {
+	instrumentMatches := instrumentalistAfterPunctuationPat.FindAllStringSubmatch(album, -1)
+	if len(instrumentMatches) == 0 {
+		instrumentMatches = instrumentalistPattern.FindAllStringSubmatch(album, -1)
+	}
+	for _, matches := range instrumentMatches {
+		if len(matches) < 3 {
+			continue
+		}
+		performer := cleanClassicalNameNoise(matches[1])
+		if performer != "" && performer != meta.Composer && !strings.Contains(performer, meta.Work) {
+			if meta.Performer == "" || strings.Contains(meta.Performer, "指挥") {
 				meta.Performer = performer
-				meta.Instrument = strings.TrimSpace(matches[2])
 			}
+			meta.Instrument = strings.TrimSpace(matches[2])
 		}
 	}
 	return meta
@@ -976,13 +984,49 @@ func (m classicalMetadata) OrchestraName() string {
 }
 
 func (m classicalMetadata) AlbumName(fallback string) string {
+	base := ""
 	if m.Composer != "" && m.Work != "" {
-		return normalizeAlbumName(m.Composer + ": " + m.Work)
+		base = m.Composer + ": " + m.Work
+	} else if m.Work != "" {
+		base = m.Work
+	} else {
+		base = fallback
 	}
-	if m.Work != "" {
-		return normalizeAlbumName(m.Work)
+	if disambiguator := m.AlbumDisambiguator(); disambiguator != "" && !strings.Contains(base, disambiguator) {
+		base = strings.TrimSpace(base + " - " + disambiguator)
 	}
-	return fallback
+	return normalizeAlbumName(base)
+}
+
+func (m classicalMetadata) AlbumDisambiguator() string {
+	var parts []string
+	add := func(part string) {
+		part = strings.TrimSpace(part)
+		if part == "" || part == m.Composer || part == m.Work {
+			return
+		}
+		for _, existing := range parts {
+			if existing == part {
+				return
+			}
+		}
+		parts = append(parts, part)
+	}
+	if m.Performer != "" && !strings.Contains(m.Performer, "指挥") {
+		for _, part := range strings.FieldsFunc(m.Performer, func(r rune) bool { return r == ',' || r == '，' || r == '/' || r == '、' }) {
+			add(part)
+		}
+	}
+	if len(parts) > 0 {
+		add(m.Conductor)
+	}
+	if len(parts) == 0 && m.Ensemble != "" && m.Conductor == "" {
+		add(m.Ensemble)
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.Join(parts, ", ")
 }
 
 func (m classicalMetadata) PreferredArtist(fallback string) string {
