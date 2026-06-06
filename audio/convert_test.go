@@ -177,6 +177,14 @@ func TestRelatedCatalogsOnlyUsesCurrentPhysicalDiscCatalog(t *testing.T) {
 	}
 }
 
+func TestRelatedMetadataCatalogsIncludesEarlierBoxCatalogs(t *testing.T) {
+	got := relatedMetadataCatalogs("PHCP-24028")
+	want := []string{"PHCP-24028", "PHCP-24027", "PHCP-24026", "PHCP-24025"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("relatedMetadataCatalogs() = %#v, want %#v", got, want)
+	}
+}
+
 func TestFirstYearIgnoresNonDigits(t *testing.T) {
 	if got := firstYear("12 Vinyl 02"); got != "" {
 		t.Fatalf("firstYear() = %q, want empty", got)
@@ -533,9 +541,13 @@ func TestEnrichClassicalMetadataFromDiscogsAddsChineseWorkPrefix(t *testing.T) {
 		ID:      12305820,
 		Title:   "The Sonatas For Piano And Violin = Die Sonaten Für Klavier Und Violine",
 		Artists: []string{"Ludwig van Beethoven"},
+		Credits: []api.DiscogsCredit{{Name: "Ingrid Haebler", Role: "Piano"}, {Name: "Henryk Szeryng", Role: "Violin"}},
 	})
 	if !strings.Contains(got.Composer, "贝多芬") || !strings.HasPrefix(got.Work, "小提琴奏鸣曲全集-") {
 		t.Fatalf("Composer/Work = %q/%q, want bilingual classical metadata", got.Composer, got.Work)
+	}
+	if got.Performer == "" {
+		t.Fatalf("Performer is empty, want Discogs instrumental credits")
 	}
 }
 

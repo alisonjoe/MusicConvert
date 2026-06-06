@@ -1213,6 +1213,7 @@ func enrichClassicalMetadataFromDiscogs(meta classicalMetadata, release api.Disc
 	}
 	discogsConductor := ""
 	discogsEnsemble := ""
+	var discogsPerformers []string
 	for _, credit := range release.Credits {
 		role := strings.ToLower(credit.Role)
 		if discogsConductor == "" && strings.Contains(role, "conduct") {
@@ -1220,9 +1221,14 @@ func enrichClassicalMetadataFromDiscogs(meta classicalMetadata, release api.Disc
 				discogsConductor = name
 			}
 		}
-		if discogsEnsemble == "" && (strings.Contains(role, "orchestra") || strings.Contains(role, "perform")) {
+		if discogsEnsemble == "" && (strings.Contains(role, "orchestra") || strings.Contains(role, "quartet") || strings.Contains(role, "trio") || strings.Contains(role, "quintet") || strings.Contains(role, "ensemble")) {
 			if name := strings.TrimSpace(normalizeArtistName(credit.Name)); name != "" {
 				discogsEnsemble = name
+			}
+		}
+		if strings.Contains(role, "piano") || strings.Contains(role, "violin") || strings.Contains(role, "cello") || strings.Contains(role, "flute") || strings.Contains(role, "clarinet") {
+			if name := strings.TrimSpace(normalizeArtistName(credit.Name)); name != "" {
+				discogsPerformers = append(discogsPerformers, name)
 			}
 		}
 	}
@@ -1239,6 +1245,9 @@ func enrichClassicalMetadataFromDiscogs(meta classicalMetadata, release api.Disc
 	}
 	if discogsEnsemble != "" {
 		meta.Ensemble = preferClassicalCreditName(meta.Ensemble, discogsEnsemble)
+	}
+	if meta.Performer == "" && len(discogsPerformers) > 0 {
+		meta.Performer = strings.Join(discogsPerformers, ", ")
 	}
 	if meta.Conductor != "" && meta.Ensemble != "" {
 		meta.Performer = meta.Conductor + "指挥" + meta.Ensemble
@@ -1367,13 +1376,47 @@ func relatedCatalogs(catalog string) []string {
 	return []string{catalog}
 }
 
+func relatedMetadataCatalogs(catalog string) []string {
+	catalogs := relatedCatalogs(catalog)
+	if len(catalogs) == 0 {
+		return nil
+	}
+	seen := map[string]bool{catalogs[0]: true}
+	matches := catalogNumberPattern.FindStringSubmatch(catalogs[0])
+	if len(matches) >= 3 {
+		prefix := strings.ReplaceAll(matches[1], " ", "")
+		numText := matches[2]
+		if n, err := strconv.Atoi(numText); err == nil {
+			for delta := 1; delta <= 3; delta++ {
+				if n-delta <= 0 {
+					break
+				}
+				candidate := fmt.Sprintf("%s%0*d", prefix, len(numText), n-delta)
+				if !seen[candidate] {
+					seen[candidate] = true
+					catalogs = append(catalogs, candidate)
+				}
+			}
+		}
+	}
+	return catalogs
+}
+
 func fetchDiscogsMetaForClassical(classicalMeta classicalMetadata) (api.DiscogsReleaseMeta, string) {
 	if !classicalMeta.IsClassical() {
 		return api.DiscogsReleaseMeta{}, ""
 	}
-	for _, catalog := range relatedCatalogs(classicalMeta.Catalog) {
+	primary := ""
+	if catalogs := relatedCatalogs(classicalMeta.Catalog); len(catalogs) > 0 {
+		primary = catalogs[0]
+	}
+	for _, catalog := range relatedMetadataCatalogs(classicalMeta.Catalog) {
 		meta, source := api.FetchDiscogsReleaseMeta(catalog, classicalMeta.SearchHints())
 		if meta.ID > 0 {
+			if primary != "" && catalog != primary {
+				meta.Tracks = nil
+				source += ":metadata"
+			}
 			return meta, source
 		}
 	}
