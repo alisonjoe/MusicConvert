@@ -399,7 +399,7 @@ func remapTrackTitlesForSource(filePath string, tracks map[int]string) map[int]s
 		}
 	}
 	if len(remapped) == 0 {
-		return tracks
+		return nil
 	}
 	return remapped
 }
@@ -1333,26 +1333,7 @@ func relatedCatalogs(catalog string) []string {
 	if catalog == "" {
 		return nil
 	}
-	seen := map[string]bool{catalog: true}
-	catalogs := []string{catalog}
-	matches := catalogNumberPattern.FindStringSubmatch(catalog)
-	if len(matches) >= 3 {
-		prefix := strings.ReplaceAll(matches[1], " ", "")
-		numText := matches[2]
-		if n, err := strconv.Atoi(numText); err == nil {
-			for delta := 1; delta <= 3; delta++ {
-				if n-delta <= 0 {
-					break
-				}
-				candidate := fmt.Sprintf("%s%0*d", prefix, len(numText), n-delta)
-				if !seen[candidate] {
-					seen[candidate] = true
-					catalogs = append(catalogs, candidate)
-				}
-			}
-		}
-	}
-	return catalogs
+	return []string{catalog}
 }
 
 func fetchDiscogsMetaForClassical(classicalMeta classicalMetadata) (api.DiscogsReleaseMeta, string) {

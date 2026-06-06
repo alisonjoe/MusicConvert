@@ -159,9 +159,9 @@ func TestCatalogDirectoryParsing(t *testing.T) {
 	}
 }
 
-func TestRelatedCatalogsIncludesEarlierBoxCatalogs(t *testing.T) {
+func TestRelatedCatalogsOnlyUsesCurrentPhysicalDiscCatalog(t *testing.T) {
 	got := relatedCatalogs("PHCP-24028")
-	want := []string{"PHCP-24028", "PHCP-24027", "PHCP-24026", "PHCP-24025"}
+	want := []string{"PHCP-24028"}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("relatedCatalogs() = %#v, want %#v", got, want)
 	}
