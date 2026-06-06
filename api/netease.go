@@ -751,16 +751,34 @@ func GetTranslatedArtistAlbum(artist, album string) (string, string, string, str
 	albumName := album
 	coverUrl := ""
 	yearStr := ""
-	apiURL := fmt.Sprintf("http://music.163.com/api/search/get/web?s=%s&type=10&offset=0&limit=1", url.QueryEscape(album))
+
+	albumID := FindAlbumID(artist, album)
+	if albumID <= 0 && canonical != artist {
+		albumID = FindAlbumID(canonical, album)
+	}
+	if albumID <= 0 {
+		log.Printf("[Album Cover] No validated album match for %s / %s; skip cover fallback", artist, album)
+		return canonical, canonical, albumName, coverUrl, yearStr
+	}
+
+	detail, err := GetAlbumDetail(albumID)
+	if err != nil {
+		log.Printf("[Album Cover] Failed to fetch validated album detail for %s / %s (albumID=%d): %v", artist, album, albumID, err)
+		return canonical, canonical, albumName, coverUrl, yearStr
+	}
+	albumName = PreferDetailedAlbumName(detail.Album.Name, album)
+	coverUrl = detail.Album.PicUrl
+
+	apiURL := fmt.Sprintf("http://music.163.com/api/search/get/web?s=%s&type=10&offset=0&limit=10", url.QueryEscape(strings.TrimSpace(artist+" "+album)))
 	body, err := doRequestWithRetry(apiURL)
 	if err == nil {
 		var res NeteaseAlbumSearchResp
-		if err := json.Unmarshal(body, &res); err == nil && len(res.Result.Albums) > 0 {
-			a := res.Result.Albums[0]
-			albumName = PreferDetailedAlbumName(a.Name, album)
-			coverUrl = a.PicUrl
-			if a.PublishTime > 0 {
-				yearStr = fmt.Sprintf("%d", time.Unix(a.PublishTime/1000, 0).Year())
+		if err := json.Unmarshal(body, &res); err == nil {
+			for _, a := range res.Result.Albums {
+				if a.Id == albumID && a.PublishTime > 0 {
+					yearStr = fmt.Sprintf("%d", time.Unix(a.PublishTime/1000, 0).Year())
+					break
+				}
 			}
 		}
 	}
