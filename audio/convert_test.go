@@ -547,6 +547,14 @@ func TestApplyClassicalMetadataTags(t *testing.T) {
 	}
 }
 
+func TestNormalizeAlbumNameRewritesNumeroSign(t *testing.T) {
+	got := normalizeAlbumName("Sonata N°1 In D, Op. 12 N° 1")
+	want := "Sonata No. 1 In D, Op. 12 No. 1"
+	if got != want {
+		t.Fatalf("normalizeAlbumName() = %q, want %q", got, want)
+	}
+}
+
 func TestTitleFromOnlineTrackPrefixesChineseWorkForClassicalGenericTitle(t *testing.T) {
 	meta := parseClassicalAlbumMetadata("PHCP-24002史特拉汶斯基「春之祭」。戴維斯指揮阿姆斯丹堂管弦樂團。")
 	tracks := map[int]string{8: "The Rite of Spring: Part II. The Sacrifice"}

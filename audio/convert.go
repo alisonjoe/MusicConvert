@@ -25,6 +25,7 @@ var (
 	genericTrackTitlePattern = regexp.MustCompile(`(?i)^track\s*0*([0-9]+)$`)
 	catalogPrefixPattern     = regexp.MustCompile(`(?i)^\s*([A-Z]{2,}[-_ ]?\d+)\s*`)
 	catalogNumberPattern     = regexp.MustCompile(`(?i)^([A-Z]{2,}[-_ ]?)(\d+)$`)
+	numeroNoSpacePattern     = regexp.MustCompile(`\bNo\.\s*([0-9]+)`)
 	quotedClassicalPattern   = regexp.MustCompile(`^\s*(?i:[A-Z]{2,}[-_ ]?\d+)?\s*([^「」『』《》]+)[「『《]([^」』》]+)[」』》]`)
 	colonClassicalPattern    = regexp.MustCompile(`^\s*(?i:[A-Z]{2,}[-_ ]?\d+)?\s*([^:：。「」]+)[:：]\s*([^。]+)`)
 	hyphenClassicalPattern   = regexp.MustCompile(`^\s*(?i:[A-Z]{2,}[-_ ]?\d+)?\s*([\p{Han}A-Za-z][^-。]+)-\s*([^。]+?(?:协奏曲|奏鸣曲|交响曲|五重奏|四重奏|三重奏|Concerto|Sonata|Symphony|Quintet|Quartet|Trio)[^。]*)`)
@@ -777,6 +778,9 @@ func normalizeAlbumName(album string) string {
 		"’", "'",
 		"“", "\"",
 		"”", "\"",
+		"N°", "No.",
+		"n°", "No.",
+		"№", "No.",
 		"𫚭", "鳟",
 		"鱲", "鳟",
 	)
@@ -789,6 +793,7 @@ func normalizeAlbumName(album string) string {
 	album = strings.ReplaceAll(album, "：-", ": ")
 	album = strings.ReplaceAll(album, "： -", ": ")
 	album = strings.Join(strings.Fields(album), " ")
+	album = numeroNoSpacePattern.ReplaceAllString(album, "No. $1")
 	return strings.TrimSpace(album)
 }
 
