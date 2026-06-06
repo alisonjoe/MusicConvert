@@ -299,6 +299,13 @@ func TestCanonicalOrchestraUsesLaterEqualLengthCandidate(t *testing.T) {
 	}
 }
 
+func TestPreferItunesAlbumArtistKeepsChineseArtist(t *testing.T) {
+	got := preferItunesAlbumArtist("蔡健雅", "Tanya Chua")
+	if got != "蔡健雅" {
+		t.Fatalf("preferItunesAlbumArtist() = %q, want 蔡健雅", got)
+	}
+}
+
 func TestPreferItunesAlbumNameRejectsDifferentBootlegVolume(t *testing.T) {
 	current := "The Bootleg Series Volumes 1-3 (Rare & Unreleased) 1961-1991"
 	got := preferItunesAlbumName(current, "The Bootleg Series, Vol. 9: The Witmark Demos: 1962-1964")

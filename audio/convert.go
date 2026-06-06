@@ -709,6 +709,18 @@ func preferItunesAlbumName(currentAlbum, itunesAlbum string) string {
 	return currentAlbum
 }
 
+func preferItunesAlbumArtist(currentArtist, itunesArtist string) string {
+	currentArtist = strings.TrimSpace(currentArtist)
+	itunesArtist = strings.TrimSpace(itunesArtist)
+	if itunesArtist == "" {
+		return currentArtist
+	}
+	if currentArtist != "" && api.ContainsChinese(currentArtist) && !api.ContainsChinese(itunesArtist) {
+		return currentArtist
+	}
+	return simplifyMetadataText(primaryAlbumArtist(itunesArtist))
+}
+
 func albumDirectoryYear(sourceAlbumDir, originalAlbum, finalAlbum string, fallbackValues ...string) string {
 	sourceYear := ""
 	if albumNamesSimilar(sourceAlbumDir, finalAlbum) || albumNamesSimilar(originalAlbum, finalAlbum) {
@@ -1833,7 +1845,7 @@ PROCESS_PATH:
 		}
 	}
 	if itunesMeta.AlbumArtist != "" && !classicalMeta.IsClassical() {
-		finalMainArtist = simplifyMetadataText(primaryAlbumArtist(itunesMeta.AlbumArtist))
+		finalMainArtist = preferItunesAlbumArtist(finalMainArtist, itunesMeta.AlbumArtist)
 	}
 	if looksLikeUnknownArtist(officialArtist) && !looksLikeUnknownArtist(finalMainArtist) {
 		officialArtist = finalMainArtist
@@ -2054,7 +2066,7 @@ PROCESS_CUE:
 		}
 	}
 	if itunesMeta.AlbumArtist != "" && !classicalMeta.IsClassical() {
-		finalMainArtist = simplifyMetadataText(primaryAlbumArtist(itunesMeta.AlbumArtist))
+		finalMainArtist = preferItunesAlbumArtist(finalMainArtist, itunesMeta.AlbumArtist)
 	}
 	if looksLikeUnknownArtist(officialArtist) && !looksLikeUnknownArtist(finalMainArtist) {
 		officialArtist = finalMainArtist
