@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -29,6 +30,51 @@ type ItunesSearchResp struct {
 		ReleaseDate      string `json:"releaseDate"`
 		DiscCount        int    `json:"discCount"`
 	} `json:"results"`
+}
+
+func itunesContextArtistAlbum(contextLabel string) (string, string) {
+	artist, album := "", ""
+	for _, part := range []string{"artist=", "album="} {
+		idx := strings.Index(contextLabel, part)
+		if idx < 0 {
+			continue
+		}
+		start := idx + len(part)
+		if start < len(contextLabel) && contextLabel[start] == '"' {
+			start++
+			end := strings.Index(contextLabel[start:], "\"")
+			if end >= 0 {
+				if part == "artist=" {
+					artist = contextLabel[start : start+end]
+				} else {
+					album = contextLabel[start : start+end]
+				}
+			}
+		}
+	}
+	return artist, album
+}
+
+func itunesCandidateScore(queryArtist, queryAlbum, candidateArtist, candidateAlbum string) int {
+	qa := normalizeSongName(queryArtist)
+	qalb := normalizeSongName(queryAlbum)
+	ca := normalizeSongName(candidateArtist)
+	calb := normalizeSongName(candidateAlbum)
+	if qalb == "" || calb == "" {
+		return 0
+	}
+	score := 0
+	if calb == qalb {
+		score += 60
+	} else if strings.HasPrefix(calb, qalb) && (strings.Contains(calb, "deluxe") || strings.Contains(calb, "edition")) {
+		score += 45
+	} else {
+		return 0
+	}
+	if qa != "" && ca == qa {
+		score += 40
+	}
+	return score
 }
 
 // FetchItunesMeta queries Apple iTunes API for rich album metadata
@@ -65,11 +111,23 @@ func fetchItunesMetaForQuery(query, contextLabel string) ItunesMeta {
 	var res ItunesSearchResp
 	if err := json.NewDecoder(resp.Body).Decode(&res); err == nil && len(res.Results) > 0 {
 		log.Printf("[iTunes Candidates] count=%d for %s", len(res.Results), contextLabel)
+		queryArtist, queryAlbum := itunesContextArtistAlbum(contextLabel)
+		bestIndex := -1
+		bestScore := 0
 		for i, r := range res.Results {
-			log.Printf("[iTunes Candidate %02d] artist=%q album=%q genre=%q release=%q disc_count=%d",
-				i+1, r.ArtistName, r.CollectionName, r.PrimaryGenreName, r.ReleaseDate, r.DiscCount)
+			score := itunesCandidateScore(queryArtist, queryAlbum, r.ArtistName, r.CollectionName)
+			log.Printf("[iTunes Candidate %02d] artist=%q album=%q genre=%q release=%q disc_count=%d score=%d",
+				i+1, r.ArtistName, r.CollectionName, r.PrimaryGenreName, r.ReleaseDate, r.DiscCount, score)
+			if score > bestScore {
+				bestScore = score
+				bestIndex = i
+			}
 		}
-		r := res.Results[0]
+		if bestIndex < 0 {
+			log.Printf("[iTunes Candidates] no context match for %s", contextLabel)
+			return meta
+		}
+		r := res.Results[bestIndex]
 		meta.Genre = r.PrimaryGenreName
 		meta.AlbumArtist = r.ArtistName
 		meta.CollectionName = r.CollectionName
