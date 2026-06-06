@@ -239,7 +239,7 @@ func sourceAlbumDirName(filePath string) string {
 	parent := filepath.Base(filepath.Dir(filePath))
 	if isDiscDir(parent) || isCatalogOnlyDir(parent) {
 		grandParent := filepath.Base(filepath.Dir(filepath.Dir(filePath)))
-		if grandParent != "." && grandParent != string(os.PathSeparator) {
+		if grandParent != "." && grandParent != string(os.PathSeparator) && !looksLikeGenericMusicFolder(grandParent) {
 			return grandParent
 		}
 	}
@@ -954,7 +954,7 @@ func parseClassicalAlbumMetadata(album string) classicalMetadata {
 }
 
 func (m classicalMetadata) IsClassical() bool {
-	return m.Composer != "" || m.Work != "" || m.Conductor != "" || m.Ensemble != "" || m.Instrument != ""
+	return m.Catalog != "" || m.Composer != "" || m.Work != "" || m.Conductor != "" || m.Ensemble != "" || m.Instrument != ""
 }
 
 func (m classicalMetadata) OrchestraName() string {
@@ -1591,7 +1591,10 @@ func singleConvert(ctx context.Context, st model.MusicFileInfo, outRoot string) 
 
 	// 清理并规范化专辑提示
 	albumHint := api.CleanHint(origAlbum)
-	if isCatalogOnlyDir(albumHint) && sourceAlbumDir != "" {
+	if sourceCatalog(st.FilePath) != "" && looksLikeGenericMusicFolder(albumHint) {
+		albumHint = sourceCatalog(st.FilePath)
+	}
+	if isCatalogOnlyDir(albumHint) && sourceAlbumDir != "" && !looksLikeGenericMusicFolder(sourceAlbumDir) {
 		albumHint = strings.TrimSpace(albumHint + " " + api.CleanHint(sourceAlbumDir))
 	}
 	if albumHint == "" || albumHint == "Unknown Album" {

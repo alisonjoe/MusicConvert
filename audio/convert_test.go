@@ -121,6 +121,16 @@ func TestVinylDiscDirectoryParsing(t *testing.T) {
 	}
 }
 
+func TestCatalogDirectoryUsesCatalogWhenParentIsGeneric(t *testing.T) {
+	path := "/volume4/Music/import/PHILIPS首版系列纸盒WAV/PHCP-24026/Track01.wav"
+	if got, want := sourceAlbumDirName(path), "PHCP-24026"; got != want {
+		t.Fatalf("sourceAlbumDirName() = %q, want %q", got, want)
+	}
+	if got, want := parseClassicalAlbumMetadata("PHCP-24026").Catalog, "PHCP-24026"; got != want {
+		t.Fatalf("Catalog = %q, want %q", got, want)
+	}
+}
+
 func TestCatalogDirectoryParsing(t *testing.T) {
 	dir := t.TempDir()
 	albumDir := filepath.Join(dir, "贝多芬：小提琴奏鸣曲全集-谢林,海布勒")
