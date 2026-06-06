@@ -9,11 +9,13 @@ import (
 	"MusicConvert/util"
 	"context"
 	"flag"
+	"io"
 	"log"
 	"os"
 	"os/exec"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 )
@@ -22,6 +24,23 @@ var convertChan = make(chan model.MusicFileInfo, 1000)
 var delChan = make(chan string, 1000)
 
 const buildVersion = "metadata-fix-v2-net-ease-album-order"
+
+func initLogFile() *os.File {
+	logDir := "logs"
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		log.Printf("Warning: Failed to create log directory %s: %v", logDir, err)
+		return nil
+	}
+	logPath := "logs/MusicConvert-" + time.Now().Format("20060102-150405") + ".log"
+	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		log.Printf("Warning: Failed to open log file %s: %v", logPath, err)
+		return nil
+	}
+	log.SetOutput(io.MultiWriter(os.Stdout, file))
+	log.Printf("Log file: %s", logPath)
+	return file
+}
 
 func CheckEnvironment() {
 	tools := []string{"ffmpeg", "ffprobe", "metaflac"}
@@ -39,6 +58,11 @@ func main() {
 	rescanAll := flag.Bool("rescan-all", false, "delete all conversion records before processing")
 	testSpotify := flag.Bool("test-spotify", false, "test Spotify API credentials and search, then exit")
 	flag.Parse()
+
+	logFile := initLogFile()
+	if logFile != nil {
+		defer logFile.Close()
+	}
 
 	log.Printf("MusicConvert build: %s", buildVersion)
 	CheckEnvironment()
