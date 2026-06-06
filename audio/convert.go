@@ -24,6 +24,7 @@ var (
 	bootlegSeriesTitleWords  = regexp.MustCompile(`(?i)\bbootleg\b.*\bseries\b`)
 	genericTrackTitlePattern = regexp.MustCompile(`(?i)^track\s*0*([0-9]+)$`)
 	catalogPrefixPattern     = regexp.MustCompile(`(?i)^\s*([A-Z]{2,}[-_ ]?\d+)\s*`)
+	catalogNumberPattern     = regexp.MustCompile(`(?i)^([A-Z]{2,}[-_ ]?)(\d+)$`)
 	quotedClassicalPattern   = regexp.MustCompile(`^\s*(?i:[A-Z]{2,}[-_ ]?\d+)?\s*([^「」『』《》]+)[「『《]([^」』》]+)[」』》]`)
 	colonClassicalPattern    = regexp.MustCompile(`^\s*(?i:[A-Z]{2,}[-_ ]?\d+)?\s*([^:：。「」]+)[:：]\s*([^。]+)`)
 	hyphenClassicalPattern   = regexp.MustCompile(`^\s*(?i:[A-Z]{2,}[-_ ]?\d+)?\s*([\p{Han}A-Za-z][^-。]+)-\s*([^。]+?(?:协奏曲|奏鸣曲|交响曲|五重奏|四重奏|三重奏|Concerto|Sonata|Symphony|Quintet|Quartet|Trio)[^。]*)`)
@@ -327,7 +328,11 @@ func sourceDiscCount(filePath string) int {
 }
 
 func sourceDiscTrackCount(filePath string) int {
-	entries, err := os.ReadDir(filepath.Dir(filePath))
+	return trackCountInDir(filepath.Dir(filePath))
+}
+
+func trackCountInDir(dir string) int {
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return 0
 	}
@@ -342,6 +347,61 @@ func sourceDiscTrackCount(filePath string) int {
 		}
 	}
 	return count
+}
+
+func sourceDiscTrackOffset(filePath string) int {
+	parent := filepath.Base(filepath.Dir(filePath))
+	albumDir := filepath.Dir(filepath.Dir(filePath))
+	var siblings []string
+	if isCatalogOnlyDir(parent) {
+		siblings = catalogSiblingDirs(filePath)
+	} else if isDiscDir(parent) {
+		entries, err := os.ReadDir(albumDir)
+		if err != nil {
+			return 0
+		}
+		for _, entry := range entries {
+			if entry.IsDir() && isDiscDir(entry.Name()) {
+				siblings = append(siblings, entry.Name())
+			}
+		}
+		sort.Slice(siblings, func(i, j int) bool { return discNumberFromName(siblings[i]) < discNumberFromName(siblings[j]) })
+	}
+	if len(siblings) == 0 {
+		return 0
+	}
+	offset := 0
+	for _, sibling := range siblings {
+		if sibling == parent {
+			return offset
+		}
+		offset += trackCountInDir(filepath.Join(albumDir, sibling))
+	}
+	return 0
+}
+
+func remapTrackTitlesForSource(filePath string, tracks map[int]string) map[int]string {
+	if len(tracks) == 0 {
+		return tracks
+	}
+	offset := sourceDiscTrackOffset(filePath)
+	if offset <= 0 {
+		return tracks
+	}
+	count := sourceDiscTrackCount(filePath)
+	if count <= 0 {
+		return tracks
+	}
+	remapped := make(map[int]string)
+	for i := 1; i <= count; i++ {
+		if title := strings.TrimSpace(tracks[offset+i]); title != "" {
+			remapped[i] = title
+		}
+	}
+	if len(remapped) == 0 {
+		return tracks
+	}
+	return remapped
 }
 
 func sourceDiscTrackTitles(filePath string) map[int]string {
@@ -1268,11 +1328,44 @@ func titleFromOnlineTrack(trackNum int, currentTitle string, trackTitles map[int
 	return currentTitle
 }
 
+func relatedCatalogs(catalog string) []string {
+	catalog = strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(catalog), "_", "-"))
+	if catalog == "" {
+		return nil
+	}
+	seen := map[string]bool{catalog: true}
+	catalogs := []string{catalog}
+	matches := catalogNumberPattern.FindStringSubmatch(catalog)
+	if len(matches) >= 3 {
+		prefix := strings.ReplaceAll(matches[1], " ", "")
+		numText := matches[2]
+		if n, err := strconv.Atoi(numText); err == nil {
+			for delta := 1; delta <= 3; delta++ {
+				if n-delta <= 0 {
+					break
+				}
+				candidate := fmt.Sprintf("%s%0*d", prefix, len(numText), n-delta)
+				if !seen[candidate] {
+					seen[candidate] = true
+					catalogs = append(catalogs, candidate)
+				}
+			}
+		}
+	}
+	return catalogs
+}
+
 func fetchDiscogsMetaForClassical(classicalMeta classicalMetadata) (api.DiscogsReleaseMeta, string) {
 	if !classicalMeta.IsClassical() {
 		return api.DiscogsReleaseMeta{}, ""
 	}
-	return api.FetchDiscogsReleaseMeta(classicalMeta.Catalog, classicalMeta.SearchHints())
+	for _, catalog := range relatedCatalogs(classicalMeta.Catalog) {
+		meta, source := api.FetchDiscogsReleaseMeta(catalog, classicalMeta.SearchHints())
+		if meta.ID > 0 {
+			return meta, source
+		}
+	}
+	return api.DiscogsReleaseMeta{}, ""
 }
 
 func localizedClassicalTrackTitles(classicalMeta classicalMetadata) (map[int]string, string) {
@@ -1291,25 +1384,27 @@ func albumTrackTitlesForConversion(filePath, artist, album string, classicalMeta
 		return sourceTracks, "source_dir"
 	}
 	if tracks, source := localizedClassicalTrackTitles(classicalMeta); len(tracks) > 0 {
-		return tracks, source
+		return remapTrackTitlesForSource(filePath, tracks), source
 	}
 	if classicalMeta.IsClassical() && hasChineseClassicalContext(classicalMeta) {
 		if tracks, source := api.GetAlbumTrackTitlesWithSource(artist, album); len(tracks) > 0 {
-			return tracks, source
+			return remapTrackTitlesForSource(filePath, tracks), source
 		}
 	}
 	if classicalMeta.IsClassical() {
-		if tracks, source := api.FetchMBReleaseTrackTitles(classicalMeta.Catalog, ""); len(tracks) > 0 {
-			return tracks, source
+		for _, catalog := range relatedCatalogs(classicalMeta.Catalog) {
+			if tracks, source := api.FetchMBReleaseTrackTitles(catalog, ""); len(tracks) > 0 {
+				return remapTrackTitlesForSource(filePath, tracks), source
+			}
 		}
 		for _, queryHint := range classicalMeta.SearchHints() {
 			if tracks, source := api.FetchMBReleaseTrackTitles("", queryHint); len(tracks) > 0 {
-				return tracks, source
+				return remapTrackTitlesForSource(filePath, tracks), source
 			}
 		}
 	}
 	if tracks, source := api.GetAlbumTrackTitlesWithSource(artist, album); len(tracks) > 0 {
-		return tracks, source
+		return remapTrackTitlesForSource(filePath, tracks), source
 	}
 	return nil, "empty"
 }
@@ -1653,11 +1748,11 @@ PROCESS_PATH:
 	var trackTitles map[int]string
 	trackTitleSource := ""
 	if len(discogsMeta.Tracks) > 0 && !hasChineseClassicalContext(classicalMeta) {
-		trackTitles, trackTitleSource = discogsMeta.Tracks, discogsSource
+		trackTitles, trackTitleSource = remapTrackTitlesForSource(st.FilePath, discogsMeta.Tracks), discogsSource
 	} else {
 		trackTitles, trackTitleSource = albumTrackTitlesForConversion(st.FilePath, finalMainArtist, officialAlbum, classicalMeta)
 		if len(trackTitles) == 0 && len(discogsMeta.Tracks) > 0 {
-			trackTitles, trackTitleSource = discogsMeta.Tracks, discogsSource
+			trackTitles, trackTitleSource = remapTrackTitlesForSource(st.FilePath, discogsMeta.Tracks), discogsSource
 		}
 	}
 	resolvedTitle := titleFromOnlineTrack(trackNum, officialTitle, trackTitles, classicalMeta)

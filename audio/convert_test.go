@@ -142,6 +142,29 @@ func TestCatalogDirectoryParsing(t *testing.T) {
 	if got, want := sourceCatalog(path), "PHCP-24029"; got != want {
 		t.Fatalf("sourceCatalog() = %q, want %q", got, want)
 	}
+	for _, name := range []string{"Track01.wav", "Track02.wav"} {
+		if err := os.WriteFile(filepath.Join(albumDir, "PHCP-24028", name), []byte(""), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, name := range []string{"Track01.wav", "Track02.wav", "Track03.wav"} {
+		if err := os.WriteFile(filepath.Join(albumDir, "PHCP-24029", name), []byte(""), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tracks := map[int]string{1: "d1t1", 2: "d1t2", 3: "d2t1", 4: "d2t2", 5: "d2t3"}
+	remapped := remapTrackTitlesForSource(path, tracks)
+	if remapped[1] != "d2t1" || remapped[3] != "d2t3" || len(remapped) != 3 {
+		t.Fatalf("remapTrackTitlesForSource() = %#v", remapped)
+	}
+}
+
+func TestRelatedCatalogsIncludesEarlierBoxCatalogs(t *testing.T) {
+	got := relatedCatalogs("PHCP-24028")
+	want := []string{"PHCP-24028", "PHCP-24027", "PHCP-24026", "PHCP-24025"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("relatedCatalogs() = %#v, want %#v", got, want)
+	}
 }
 
 func TestFirstYearIgnoresNonDigits(t *testing.T) {
