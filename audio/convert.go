@@ -1494,6 +1494,11 @@ func localizedClassicalTrackTitles(classicalMeta classicalMetadata) (map[int]str
 }
 
 func albumTrackTitlesForConversion(filePath, artist, album string, classicalMeta classicalMetadata) (map[int]string, string) {
+	if !classicalMeta.IsClassical() {
+		if tracks, source := api.GetAlbumTrackTitlesWithSource(artist, album); len(tracks) > 0 {
+			return remapTrackTitlesForSource(filePath, tracks), source
+		}
+	}
 	if sourceTracks := sourceDiscTrackTitles(filePath); len(sourceTracks) > 0 {
 		return sourceTracks, "source_dir"
 	}
@@ -1882,6 +1887,9 @@ PROCESS_PATH:
 		if len(trackTitles) == 0 && len(discogsMeta.Tracks) > 0 {
 			trackTitles, trackTitleSource = remapTrackTitlesForSource(st.FilePath, discogsMeta.Tracks), discogsSource
 		}
+	}
+	if len(trackTitles) > trackCount {
+		trackCount = len(trackTitles)
 	}
 	resolvedTitle := titleFromOnlineTrack(trackNum, officialTitle, trackTitles, classicalMeta)
 	if resolvedTitle != officialTitle {
