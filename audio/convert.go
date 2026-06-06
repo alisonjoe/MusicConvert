@@ -7,6 +7,7 @@ import (
 	"MusicConvert/model"
 	"MusicConvert/util"
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -17,6 +18,8 @@ import (
 	"strings"
 	"time"
 )
+
+var errSkipNoTrackMetadata = errors.New("skip: no usable track metadata")
 
 var (
 	cueDiscSuffixPattern               = regexp.MustCompile(`(?i)\s*[\[\(]\s*(?:disc|disk|cd)\s*0*([0-9]+)\s*[\]\)]\s*$`)
@@ -1652,6 +1655,9 @@ func ToFLAC(ctx context.Context, outRoot string, ch chan model.MusicFileInfo, de
 		if err == nil {
 			db.Insert(&db.MusicInfo{Music: info.FilePath, State: 1})
 			delCh <- info.FilePath
+		} else if errors.Is(err, errSkipNoTrackMetadata) {
+			log.Printf("Skipped %s: no usable track metadata found", info.FilePath)
+			db.Insert(&db.MusicInfo{Music: info.FilePath, State: 1})
 		} else {
 			log.Printf("Failed to process %s: %v", info.FilePath, err)
 		}
@@ -1881,6 +1887,9 @@ PROCESS_PATH:
 	if resolvedTitle != officialTitle {
 		log.Printf("[Track Title] %02d %q -> %q (source: %s)", trackNum, officialTitle, resolvedTitle, trackTitleSource)
 		officialTitle = resolvedTitle
+	}
+	if looksLikeGenericTrackTitle(officialTitle) {
+		return fmt.Errorf("%w: title=%q album=%q artist=%q", errSkipNoTrackMetadata, officialTitle, officialAlbum, finalMainArtist)
 	}
 
 	coverPath := ""
