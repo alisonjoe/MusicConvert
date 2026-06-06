@@ -139,6 +139,9 @@ func TestCatalogDirectoryParsing(t *testing.T) {
 	if got, want := sourceDiscCount(path), 2; got != want {
 		t.Fatalf("sourceDiscCount() = %d, want %d", got, want)
 	}
+	if got, want := sourceCatalog(path), "PHCP-24029"; got != want {
+		t.Fatalf("sourceCatalog() = %q, want %q", got, want)
+	}
 }
 
 func TestFirstYearIgnoresNonDigits(t *testing.T) {
@@ -383,8 +386,8 @@ func TestParseClassicalAlbumMetadataCleansNumberedHyphenContext(t *testing.T) {
 		t.Fatalf("Composer/Work = %q/%q, want 贝多芬/小提琴奏鸣曲全集", got.Composer, got.Work)
 	}
 	got = parseClassicalAlbumMetadata("PHCP-24028 贝多芬：小提琴奏鸣曲全集-谢林,海布勒")
-	if got.Catalog != "PHCP-24028" || got.Composer != "贝多芬" || got.Work != "小提琴奏鸣曲全集" {
-		t.Fatalf("Catalog/Composer/Work = %q/%q/%q", got.Catalog, got.Composer, got.Work)
+	if got.Catalog != "PHCP-24028" || got.Composer != "贝多芬" || got.Work != "小提琴奏鸣曲全集" || got.Performer != "谢林,海布勒" {
+		t.Fatalf("Catalog/Composer/Work/Performer = %q/%q/%q/%q", got.Catalog, got.Composer, got.Work, got.Performer)
 	}
 	if artist := normalizeArtistName("7_维瓦尔第"); artist != "维瓦尔第" {
 		t.Fatalf("normalizeArtistName() = %q, want 维瓦尔第", artist)

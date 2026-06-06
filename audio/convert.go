@@ -275,6 +275,14 @@ func catalogDiscNumberFromSource(filePath string) int {
 	return 0
 }
 
+func sourceCatalog(filePath string) string {
+	parent := filepath.Base(filepath.Dir(filePath))
+	if isCatalogOnlyDir(parent) {
+		return strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(parent), "_", "-"))
+	}
+	return ""
+}
+
 func discNumberFromSource(meta *AutoMetadata, filePath string) int {
 	for _, key := range []string{"DISCNUMBER", "DISC", "disc"} {
 		if n := parseDiscNumberTag(meta.GetTag(key)); n > 0 {
@@ -841,6 +849,9 @@ func parseClassicalAlbumMetadata(album string) classicalMetadata {
 		meta.Composer = strings.Trim(strings.TrimSpace(matches[1]), " -_.。")
 		meta.Work = strings.TrimSpace(matches[2])
 		if idx := strings.Index(meta.Work, "-"); idx >= 0 {
+			if performer := strings.TrimSpace(meta.Work[idx+1:]); performer != "" {
+				meta.Performer = performer
+			}
 			meta.Work = strings.TrimSpace(meta.Work[:idx])
 		}
 		if meta.Catalog != "" {
@@ -850,6 +861,9 @@ func parseClassicalAlbumMetadata(album string) classicalMetadata {
 	meta.Composer = cleanClassicalNameNoise(meta.Composer)
 	meta.Work = cleanClassicalNameNoise(meta.Work)
 	if idx := strings.Index(meta.Work, "-"); idx > 0 && looksLikeClassicalWork(meta.Work[:idx]) {
+		if meta.Performer == "" {
+			meta.Performer = strings.TrimSpace(meta.Work[idx+1:])
+		}
 		meta.Work = strings.TrimSpace(meta.Work[:idx])
 	}
 	if strings.Contains(meta.Work, "鳟鱼") && strings.Contains(album, "钢琴五重奏") {
@@ -869,8 +883,11 @@ func parseClassicalAlbumMetadata(album string) classicalMetadata {
 	}
 	if meta.Performer == "" {
 		if matches := instrumentalistPattern.FindStringSubmatch(album); len(matches) >= 3 {
-			meta.Performer = cleanClassicalNameNoise(matches[1])
-			meta.Instrument = strings.TrimSpace(matches[2])
+			performer := cleanClassicalNameNoise(matches[1])
+			if performer != "" && performer != meta.Composer {
+				meta.Performer = performer
+				meta.Instrument = strings.TrimSpace(matches[2])
+			}
 		}
 	}
 	return meta
@@ -1573,6 +1590,9 @@ PROCESS_PATH:
 	}
 	officialAlbum = normalizeAlbumName(officialAlbum)
 	classicalMeta := parseClassicalAlbumMetadata(officialAlbum)
+	if classicalMeta.Catalog == "" {
+		classicalMeta.Catalog = sourceCatalog(st.FilePath)
+	}
 	var discogsMeta api.DiscogsReleaseMeta
 	var discogsSource string
 	if classicalMeta.IsClassical() {
