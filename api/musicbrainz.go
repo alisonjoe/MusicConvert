@@ -187,6 +187,7 @@ func FetchMBMetadata(title, artist, albumHint string) (string, string, string, s
 	var bestMatch *MBScore
 	targetTitle := strings.ToLower(title)
 	targetArtist := strings.ToLower(artist)
+	hasArtist := targetArtist != "" && targetArtist != "unknown artist"
 	hint := strings.ToLower(albumHint)
 	hasHint := (hint != "" && hint != "unknown album")
 
@@ -211,7 +212,9 @@ func FetchMBMetadata(title, artist, albumHint string) (string, string, string, s
 			if len(r.ArtistCredit) > 0 {
 				mArtist = r.ArtistCredit[0].Artist.Name
 				mArtistLower := strings.ToLower(normalizeMBQueryText(mArtist))
-				if mArtistLower == targetArtist {
+				if !hasArtist && mArtistLower != "" {
+					artistScore = 1.0
+				} else if mArtistLower == targetArtist {
 					artistScore = 1.0
 				} else if strings.Contains(mArtistLower, targetArtist) || strings.Contains(targetArtist, mArtistLower) {
 					artistScore = 0.8
@@ -251,7 +254,9 @@ func FetchMBMetadata(title, artist, albumHint string) (string, string, string, s
 
 				// 计算总分
 				totalScore := 0.0
-				if hasHint {
+				if hasHint && !hasArtist {
+					totalScore = titleScore*0.55 + albumScore*0.45
+				} else if hasHint {
 					totalScore = titleScore*0.35 + artistScore*0.35 + albumScore*0.30
 				} else {
 					totalScore = titleScore*0.5 + artistScore*0.5
@@ -267,7 +272,7 @@ func FetchMBMetadata(title, artist, albumHint string) (string, string, string, s
 					log.Printf("[MusicBrainz Candidate %02d] artist=%q title=%q release=%q date=%q track_total=%d media=%d track=%q scores title=%.2f artist=%.2f album=%.2f total=%.2f",
 						candidateNo, mArtist, r.Title, rel.Title, rel.Date, rel.TrackCount, len(rel.Media), mTrackNum, titleScore, artistScore, albumScore, totalScore)
 				}
-				if titleScore < 0.5 || artistScore < 0.5 {
+				if titleScore < 0.5 || (hasArtist && artistScore < 0.5) {
 					continue
 				}
 

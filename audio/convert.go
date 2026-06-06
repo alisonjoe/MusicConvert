@@ -1825,10 +1825,18 @@ PROCESS_PATH:
 
 	itunesMeta := api.ItunesMeta{DiscTotal: 1}
 	if !classicalMeta.IsClassical() {
-		itunesMeta = api.FetchItunesMeta(finalMainArtist, officialAlbum)
+		fetchedItunes := api.FetchItunesMeta(finalMainArtist, officialAlbum)
+		if fetchedItunes.CollectionName == "" || albumNamesSimilar(officialAlbum, fetchedItunes.CollectionName) {
+			itunesMeta = fetchedItunes
+		} else {
+			log.Printf("[iTunes Album Context] Rejecting iTunes album %q; keeping source album context %q", fetchedItunes.CollectionName, officialAlbum)
+		}
 	}
 	if itunesMeta.AlbumArtist != "" && !classicalMeta.IsClassical() {
 		finalMainArtist = simplifyMetadataText(primaryAlbumArtist(itunesMeta.AlbumArtist))
+	}
+	if looksLikeUnknownArtist(officialArtist) && !looksLikeUnknownArtist(finalMainArtist) {
+		officialArtist = finalMainArtist
 	}
 	if itunesMeta.CollectionName != "" {
 		officialAlbum = preferItunesAlbumName(officialAlbum, itunesMeta.CollectionName)
@@ -2038,10 +2046,18 @@ PROCESS_CUE:
 	sourceDiscs := sourceDiscCount(st.FilePath)
 	itunesMeta := api.ItunesMeta{DiscTotal: 1}
 	if !classicalMeta.IsClassical() {
-		itunesMeta = api.FetchItunesMeta(finalMainArtist, officialAlbum)
+		fetchedItunes := api.FetchItunesMeta(finalMainArtist, officialAlbum)
+		if fetchedItunes.CollectionName == "" || albumNamesSimilar(officialAlbum, fetchedItunes.CollectionName) {
+			itunesMeta = fetchedItunes
+		} else {
+			log.Printf("[iTunes Album Context] Rejecting iTunes album %q; keeping source album context %q", fetchedItunes.CollectionName, officialAlbum)
+		}
 	}
 	if itunesMeta.AlbumArtist != "" && !classicalMeta.IsClassical() {
 		finalMainArtist = simplifyMetadataText(primaryAlbumArtist(itunesMeta.AlbumArtist))
+	}
+	if looksLikeUnknownArtist(officialArtist) && !looksLikeUnknownArtist(finalMainArtist) {
+		officialArtist = finalMainArtist
 	}
 	if itunesMeta.CollectionName != "" {
 		officialAlbum = preferItunesAlbumName(officialAlbum, itunesMeta.CollectionName)
