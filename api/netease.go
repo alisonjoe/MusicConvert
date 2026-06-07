@@ -570,6 +570,26 @@ func normalizeSongName(s string) string {
 	}, s)
 }
 
+func looksLikeRomanizedChineseQuery(s string) bool {
+	s = strings.ToLower(strings.TrimSpace(s))
+	words := strings.FieldsFunc(s, func(r rune) bool {
+		return !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9'))
+	})
+	if len(words) < 2 {
+		return false
+	}
+	pinyin := map[string]bool{
+		"ai": true, "an": true, "ba": true, "bai": true, "bei": true, "bu": true, "cai": true, "chang": true, "chen": true, "cheng": true, "de": true, "feng": true, "guo": true, "hao": true, "hong": true, "jian": true, "jing": true, "li": true, "liu": true, "mian": true, "nian": true, "rong": true, "shui": true, "si": true, "wu": true, "xin": true, "xuan": true, "yan": true, "yi": true, "you": true, "zhang": true,
+	}
+	matched := 0
+	for _, word := range words {
+		if pinyin[word] {
+			matched++
+		}
+	}
+	return float64(matched)/float64(len(words)) >= 0.6
+}
+
 func resolveAlbumTrackNumber(albumID int, artist, album, title string, fallbackTrack, fallbackTotal int) (int, int) {
 	trackNo := fallbackTrack
 	total := fallbackTotal
@@ -641,6 +661,8 @@ func searchSongAndMatch(query, targetTitle, targetArtist, albumHint string, pref
 			titleScore = 1.0
 		} else if strings.Contains(songName, targetTitle) || strings.Contains(targetTitle, songName) {
 			titleScore = 0.7
+		} else if containsChinese(s.Name) && looksLikeRomanizedChineseQuery(targetTitle) {
+			titleScore = 0.65
 		}
 
 		// 计算艺术家匹配度
@@ -674,8 +696,11 @@ func searchSongAndMatch(query, targetTitle, targetArtist, albumHint string, pref
 			}
 		}
 		if hasHint && albumScore < 0.8 {
-			log.Printf("[Netease Match Skip] album mismatch: title=%s candidateAlbum=%s hint=%s score=%.2f", s.Name, s.Album.Name, albumHint, albumScore)
-			continue
+			if !(containsChinese(s.Album.Name) && looksLikeRomanizedChineseQuery(hint) && sharedASCIIAlbumToken(albumHint, s.Album.Name)) {
+				log.Printf("[Netease Match Skip] album mismatch: title=%s candidateAlbum=%s hint=%s score=%.2f", s.Name, s.Album.Name, albumHint, albumScore)
+				continue
+			}
+			albumScore = 0.8
 		}
 
 		// 只有标题和艺术家都有匹配才考虑

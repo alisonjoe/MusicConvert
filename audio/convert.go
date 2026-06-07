@@ -1771,6 +1771,10 @@ func singleConvert(ctx context.Context, st model.MusicFileInfo, outRoot string) 
 		origArtist = "Unknown Artist"
 	}
 	origArtist = normalizeArtistName(origArtist)
+	pathArtist := normalizeArtistName(artistFromPath(st.FilePath))
+	if api.ContainsChinese(pathArtist) && !looksLikeGenericMusicFolder(pathArtist) && !api.ContainsChinese(origArtist) {
+		origArtist = pathArtist
+	}
 	if looksLikeGenericMusicFolder(origArtist) {
 		origArtist = "Unknown Artist"
 	}
@@ -1785,6 +1789,9 @@ func singleConvert(ctx context.Context, st model.MusicFileInfo, outRoot string) 
 
 	// 清理并规范化专辑提示
 	albumHint := api.CleanHint(origAlbum)
+	if isDiscDir(albumHint) && sourceAlbumDir != "" && !looksLikeGenericMusicFolder(sourceAlbumDir) {
+		albumHint = api.CleanHint(sourceAlbumDir)
+	}
 	if sourceCatalog(st.FilePath) != "" && looksLikeGenericMusicFolder(albumHint) {
 		albumHint = sourceCatalog(st.FilePath)
 	}

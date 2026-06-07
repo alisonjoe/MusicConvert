@@ -32,3 +32,12 @@ func TestAlbumTrackTitleCacheMatchesDetailedAlbumName(t *testing.T) {
 		t.Fatalf("GetAlbumTrackTitles() = %#v", got)
 	}
 }
+
+func TestLooksLikeRomanizedChineseQuery(t *testing.T) {
+	if !looksLikeRomanizedChineseQuery("Wu Xin Shui Mian") {
+		t.Fatalf("expected romanized Chinese query")
+	}
+	if looksLikeRomanizedChineseQuery("Back To Black Series") {
+		t.Fatalf("English album title should not be treated as romanized Chinese")
+	}
+}
