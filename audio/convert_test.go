@@ -299,6 +299,18 @@ func TestCanonicalOrchestraUsesLaterEqualLengthCandidate(t *testing.T) {
 	}
 }
 
+func TestPreferItunesChineseAlbumNameForChineseArtist(t *testing.T) {
+	finalMainArtist := "张国荣"
+	officialAlbum := "Back To Black Series - Salute"
+	itunesCollection := "復黑王: Salute"
+	if api.ContainsChinese(finalMainArtist) && api.ContainsChinese(itunesCollection) && !api.ContainsChinese(officialAlbum) {
+		officialAlbum = normalizeAlbumName(itunesCollection)
+	}
+	if officialAlbum != "复黑王: Salute" {
+		t.Fatalf("officialAlbum = %q, want 复黑王: Salute", officialAlbum)
+	}
+}
+
 func TestPreferItunesAlbumArtistKeepsChineseArtist(t *testing.T) {
 	got := preferItunesAlbumArtist("蔡健雅", "Tanya Chua")
 	if got != "蔡健雅" {

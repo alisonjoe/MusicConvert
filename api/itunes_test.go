@@ -16,3 +16,10 @@ func TestItunesCandidateScoreAcceptsExactAndDeluxe(t *testing.T) {
 		t.Fatalf("deluxe score = %d, want > 0", got)
 	}
 }
+
+func TestItunesCandidateScoreAcceptsChineseAlbumWithSharedEnglishToken(t *testing.T) {
+	got := itunesCandidateScore("张国荣", "Back To Black Series - Salute", "Leslie Cheung", "復黑王: Salute")
+	if got <= 0 {
+		t.Fatalf("score = %d, want > 0", got)
+	}
+}

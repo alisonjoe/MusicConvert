@@ -1875,7 +1875,11 @@ PROCESS_PATH:
 		officialArtist = finalMainArtist
 	}
 	if itunesMeta.CollectionName != "" {
-		officialAlbum = preferItunesAlbumName(officialAlbum, itunesMeta.CollectionName)
+		if api.ContainsChinese(finalMainArtist) && api.ContainsChinese(itunesMeta.CollectionName) && !api.ContainsChinese(officialAlbum) {
+			officialAlbum = normalizeAlbumName(itunesMeta.CollectionName)
+		} else {
+			officialAlbum = preferItunesAlbumName(officialAlbum, itunesMeta.CollectionName)
+		}
 	}
 	discCount := itunesMeta.DiscTotal
 	if discCount < sourceDiscs {
@@ -2102,7 +2106,11 @@ PROCESS_CUE:
 		officialArtist = finalMainArtist
 	}
 	if itunesMeta.CollectionName != "" {
-		officialAlbum = preferItunesAlbumName(officialAlbum, itunesMeta.CollectionName)
+		if api.ContainsChinese(finalMainArtist) && api.ContainsChinese(itunesMeta.CollectionName) && !api.ContainsChinese(officialAlbum) {
+			officialAlbum = normalizeAlbumName(itunesMeta.CollectionName)
+		} else {
+			officialAlbum = preferItunesAlbumName(officialAlbum, itunesMeta.CollectionName)
+		}
 	}
 	discCount := itunesMeta.DiscTotal
 	if discCount < sourceDiscs {

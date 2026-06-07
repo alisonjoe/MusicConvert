@@ -68,6 +68,8 @@ func itunesCandidateScore(queryArtist, queryAlbum, candidateArtist, candidateAlb
 		score += 60
 	} else if strings.HasPrefix(calb, qalb) && (strings.Contains(calb, "deluxe") || strings.Contains(calb, "edition")) {
 		score += 45
+	} else if containsChinese(queryArtist) && containsChinese(candidateAlbum) && sharedASCIIAlbumToken(queryAlbum, candidateAlbum) {
+		score += 50
 	} else {
 		return 0
 	}
@@ -75,6 +77,27 @@ func itunesCandidateScore(queryArtist, queryAlbum, candidateArtist, candidateAlb
 		score += 40
 	}
 	return score
+}
+
+func sharedASCIIAlbumToken(a, b string) bool {
+	tokens := func(s string) map[string]bool {
+		out := make(map[string]bool)
+		for _, field := range strings.FieldsFunc(strings.ToLower(s), func(r rune) bool {
+			return !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9'))
+		}) {
+			if len(field) >= 4 {
+				out[field] = true
+			}
+		}
+		return out
+	}
+	left := tokens(a)
+	for token := range tokens(b) {
+		if left[token] {
+			return true
+		}
+	}
+	return false
 }
 
 // FetchItunesMeta queries Apple iTunes API for rich album metadata
