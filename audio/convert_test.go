@@ -669,6 +669,15 @@ func TestTitleFromOnlineTrackKeepsSpecificNonClassicalTitle(t *testing.T) {
 	}
 }
 
+func TestIsLikelyPinyinTitle(t *testing.T) {
+	if !isLikelyPinyinTitle("Si Shui Liu Nian (Album Version)") {
+		t.Fatalf("expected pinyin title")
+	}
+	if isLikelyPinyinTitle("Only Love") {
+		t.Fatalf("English song title should not be treated as pinyin")
+	}
+}
+
 func TestSourceDiscTrackTitlesSkipsGenericTrackNames(t *testing.T) {
 	dir := t.TempDir()
 	for _, name := range []string{"Track07.wav", "08. Real Movement.wav"} {

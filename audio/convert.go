@@ -1403,6 +1403,46 @@ func shouldPrefixChineseWork(classicalMeta classicalMetadata, title string) bool
 	return false
 }
 
+func isLikelyPinyinTitle(title string) bool {
+	title = strings.ToLower(normalizeAlbumName(title))
+	title = regexp.MustCompile(`\([^)]*\)`).ReplaceAllString(title, " ")
+	words := strings.FieldsFunc(title, func(r rune) bool {
+		return !((r >= 'a' && r <= 'z') || r == '\'')
+	})
+	if len(words) < 2 {
+		return false
+	}
+	pinyin := map[string]bool{
+		"a": true, "ai": true, "an": true, "ang": true, "ao": true, "ba": true, "bai": true, "ban": true, "bang": true, "bei": true, "ben": true, "bi": true, "bian": true, "bie": true, "bin": true, "bo": true, "bu": true,
+		"ca": true, "cai": true, "can": true, "cang": true, "ce": true, "cen": true, "cha": true, "chai": true, "chan": true, "chang": true, "che": true, "chen": true, "cheng": true, "chi": true, "chong": true, "chou": true, "chu": true, "chuan": true, "chuang": true, "chui": true, "chun": true, "ci": true, "cong": true, "cu": true, "cui": true,
+		"da": true, "dai": true, "dan": true, "dao": true, "de": true, "deng": true, "di": true, "dian": true, "ding": true, "dong": true, "dou": true, "du": true, "dui": true, "duo": true,
+		"e": true, "en": true, "er": true, "fa": true, "fan": true, "fang": true, "fei": true, "fen": true, "feng": true, "fo": true, "fu": true,
+		"ga": true, "gai": true, "gan": true, "gang": true, "gao": true, "ge": true, "gen": true, "geng": true, "gong": true, "gou": true, "gu": true, "gua": true, "guai": true, "guan": true, "guang": true, "gui": true, "gun": true, "guo": true,
+		"ha": true, "hai": true, "han": true, "hang": true, "hao": true, "he": true, "hen": true, "heng": true, "hong": true, "hou": true, "hu": true, "hua": true, "huai": true, "huan": true, "huang": true, "hui": true, "hun": true, "huo": true,
+		"ji": true, "jia": true, "jian": true, "jiang": true, "jiao": true, "jie": true, "jin": true, "jing": true, "jiong": true, "jiu": true, "ju": true, "juan": true, "jue": true, "jun": true,
+		"ka": true, "kai": true, "kan": true, "kang": true, "kao": true, "ke": true, "ken": true, "kong": true, "kou": true, "ku": true, "kua": true, "kuai": true, "kuang": true, "kui": true, "kun": true, "kuo": true,
+		"la": true, "lai": true, "lan": true, "lang": true, "lao": true, "le": true, "lei": true, "leng": true, "li": true, "lia": true, "lian": true, "liang": true, "liao": true, "lie": true, "lin": true, "ling": true, "liu": true, "lo": true, "long": true, "lou": true, "lu": true, "luan": true, "lun": true, "luo": true,
+		"ma": true, "mai": true, "man": true, "mang": true, "mao": true, "me": true, "mei": true, "men": true, "meng": true, "mi": true, "mian": true, "miao": true, "mie": true, "min": true, "ming": true, "miu": true, "mo": true, "mou": true, "mu": true,
+		"na": true, "nai": true, "nan": true, "nang": true, "nao": true, "ne": true, "nei": true, "nen": true, "neng": true, "ni": true, "nian": true, "niang": true, "niao": true, "nie": true, "nin": true, "ning": true, "niu": true, "nong": true, "nu": true, "nuan": true, "nuo": true,
+		"o": true, "ou": true, "pa": true, "pai": true, "pan": true, "pang": true, "pao": true, "pei": true, "pen": true, "peng": true, "pi": true, "pian": true, "piao": true, "pie": true, "pin": true, "ping": true, "po": true, "pu": true,
+		"qi": true, "qia": true, "qian": true, "qiang": true, "qiao": true, "qie": true, "qin": true, "qing": true, "qiu": true, "qu": true, "quan": true, "que": true, "qun": true,
+		"ran": true, "rang": true, "rao": true, "re": true, "ren": true, "reng": true, "ri": true, "rong": true, "rou": true, "ru": true, "ruan": true, "rui": true, "run": true, "ruo": true,
+		"sa": true, "sai": true, "san": true, "sang": true, "sao": true, "se": true, "sen": true, "sha": true, "shai": true, "shan": true, "shang": true, "shao": true, "she": true, "shen": true, "sheng": true, "shi": true, "shou": true, "shu": true, "shua": true, "shuai": true, "shuan": true, "shuang": true, "shui": true, "shun": true, "shuo": true, "si": true, "song": true, "sou": true, "su": true, "sui": true, "sun": true, "suo": true,
+		"ta": true, "tai": true, "tan": true, "tang": true, "tao": true, "te": true, "teng": true, "ti": true, "tian": true, "tiao": true, "tie": true, "ting": true, "tong": true, "tou": true, "tu": true, "tuan": true, "tui": true, "tun": true, "tuo": true,
+		"wa": true, "wai": true, "wan": true, "wang": true, "wei": true, "wen": true, "weng": true, "wo": true, "wu": true, "xi": true, "xia": true, "xian": true, "xiang": true, "xiao": true, "xie": true, "xin": true, "xing": true, "xiong": true, "xiu": true, "xu": true, "xuan": true, "xue": true, "xun": true,
+		"ya": true, "yan": true, "yang": true, "yao": true, "ye": true, "yi": true, "yin": true, "ying": true, "yo": true, "yong": true, "you": true, "yu": true, "yuan": true, "yue": true, "yun": true,
+		"za": true, "zai": true, "zan": true, "zang": true, "zao": true, "ze": true, "zei": true, "zen": true, "zeng": true, "zha": true, "zhai": true, "zhan": true, "zhang": true, "zhao": true, "zhe": true, "zhen": true, "zheng": true, "zhi": true, "zhong": true, "zhou": true, "zhu": true, "zhua": true, "zhuai": true, "zhuan": true, "zhuang": true, "zhui": true, "zhun": true, "zhuo": true, "zi": true, "zong": true, "zou": true, "zu": true, "zuan": true, "zui": true, "zun": true, "zuo": true,
+	}
+	matched := 0
+	for _, word := range words {
+		word = strings.Trim(word, "'")
+		if pinyin[word] {
+			matched++
+		}
+	}
+	return float64(matched)/float64(len(words)) >= 0.6
+}
+
 func titleFromOnlineTrack(trackNum int, currentTitle string, trackTitles map[int]string, classicalMeta classicalMetadata) string {
 	onlineTitle := strings.TrimSpace(trackTitles[trackNum])
 	currentTitle = normalizeAlbumName(currentTitle)
@@ -1915,6 +1955,9 @@ PROCESS_PATH:
 	}
 	if looksLikeGenericTrackTitle(officialTitle) {
 		return fmt.Errorf("%w: title=%q album=%q artist=%q", errSkipNoTrackMetadata, officialTitle, officialAlbum, finalMainArtist)
+	}
+	if !classicalMeta.IsClassical() && (api.ContainsChinese(finalMainArtist) || api.ContainsChinese(officialAlbum)) && !api.ContainsChinese(officialTitle) && isLikelyPinyinTitle(officialTitle) {
+		return fmt.Errorf("%w: pinyin title=%q album=%q artist=%q", errSkipNoTrackMetadata, officialTitle, officialAlbum, finalMainArtist)
 	}
 
 	coverPath := ""
