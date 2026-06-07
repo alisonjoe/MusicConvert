@@ -70,6 +70,12 @@ type openAPITokenResp struct {
 }
 
 func isOpenAPIEnabled() bool {
+	if config.GetNeteaseAccessToken() != "" {
+		return true
+	}
+	if config.GetNeteaseCookie() != "" {
+		return false
+	}
 	mode := config.GetNeteaseAuthMode()
 	return mode == "openapi" || (mode == "" && config.GetNeteaseAppID() != "" && config.GetNeteasePrivateKey() != "")
 }
