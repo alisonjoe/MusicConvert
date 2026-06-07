@@ -306,6 +306,16 @@ func TestPreferItunesAlbumArtistKeepsChineseArtist(t *testing.T) {
 	}
 }
 
+func TestSelectAlbumArtistPrefersChinesePathArtist(t *testing.T) {
+	meta := &AutoMetadata{}
+	meta.Format.Tags = map[string]string{"ALBUMARTIST": "Leslie Cheung"}
+	path := "/volume4/Music/import/张国荣（qobuz）/Leslie Cheung - Back To Black Series - Salute (2010)/10. Si Shui Liu Nian.flac"
+	got := selectAlbumArtist(meta, path, "Leslie Cheung", "Leslie Cheung")
+	if got != "张国荣" {
+		t.Fatalf("selectAlbumArtist() = %q, want 张国荣", got)
+	}
+}
+
 func TestPreferItunesAlbumNameRejectsDifferentBootlegVolume(t *testing.T) {
 	current := "The Bootleg Series Volumes 1-3 (Rare & Unreleased) 1961-1991"
 	got := preferItunesAlbumName(current, "The Bootleg Series, Vol. 9: The Witmark Demos: 1962-1964")

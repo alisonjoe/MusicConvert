@@ -538,6 +538,7 @@ func primaryAlbumArtist(candidate string) string {
 
 func normalizeArtistName(artist string) string {
 	artist = strings.TrimSpace(artist)
+	artist = cleanSourceQualifier(artist)
 	artist = cleanClassicalNameNoise(artist)
 	if artist == "" {
 		return artist
@@ -555,12 +556,16 @@ func normalizeArtistName(artist string) string {
 
 func selectAlbumArtist(meta *AutoMetadata, filePath, origArtist, officialArtist string) string {
 	pathArtist := artistFromPath(filePath)
-	candidates := []string{
+	var candidates []string
+	if pathArtist != "" && api.ContainsChinese(pathArtist) && !looksLikeGenericMusicFolder(pathArtist) {
+		candidates = append(candidates, pathArtist)
+	}
+	candidates = append(candidates,
 		meta.GetTag("ALBUMARTIST"),
 		meta.GetTag("ALBUM_ARTIST"),
 		meta.GetTag("ALBUM ARTIST"),
-	}
-	if pathArtist != "" && !looksLikeGenericMusicFolder(pathArtist) {
+	)
+	if pathArtist != "" && !api.ContainsChinese(pathArtist) && !looksLikeGenericMusicFolder(pathArtist) {
 		candidates = append(candidates, pathArtist)
 	}
 	candidates = append(candidates, origArtist, officialArtist)
@@ -762,6 +767,14 @@ func albumDirName(album, year string) string {
 		return album
 	}
 	return fmt.Sprintf("%s [%s]", album, year)
+}
+
+func cleanSourceQualifier(s string) string {
+	s = strings.TrimSpace(s)
+	for _, marker := range []string{"（qobuz）", "(qobuz)", "（Qobuz）", "(Qobuz)"} {
+		s = strings.ReplaceAll(s, marker, "")
+	}
+	return strings.TrimSpace(s)
 }
 
 func cleanClassicalNameNoise(s string) string {
@@ -1858,7 +1871,7 @@ PROCESS_PATH:
 	if itunesMeta.AlbumArtist != "" && !classicalMeta.IsClassical() {
 		finalMainArtist = preferItunesAlbumArtist(finalMainArtist, itunesMeta.AlbumArtist)
 	}
-	if looksLikeUnknownArtist(officialArtist) && !looksLikeUnknownArtist(finalMainArtist) {
+	if (looksLikeUnknownArtist(officialArtist) || (api.ContainsChinese(finalMainArtist) && !api.ContainsChinese(officialArtist))) && !looksLikeUnknownArtist(finalMainArtist) {
 		officialArtist = finalMainArtist
 	}
 	if itunesMeta.CollectionName != "" {
@@ -2085,7 +2098,7 @@ PROCESS_CUE:
 	if itunesMeta.AlbumArtist != "" && !classicalMeta.IsClassical() {
 		finalMainArtist = preferItunesAlbumArtist(finalMainArtist, itunesMeta.AlbumArtist)
 	}
-	if looksLikeUnknownArtist(officialArtist) && !looksLikeUnknownArtist(finalMainArtist) {
+	if (looksLikeUnknownArtist(officialArtist) || (api.ContainsChinese(finalMainArtist) && !api.ContainsChinese(officialArtist))) && !looksLikeUnknownArtist(finalMainArtist) {
 		officialArtist = finalMainArtist
 	}
 	if itunesMeta.CollectionName != "" {
