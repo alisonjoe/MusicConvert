@@ -774,6 +774,8 @@ func cleanSourceQualifier(s string) string {
 	for _, marker := range []string{"（qobuz）", "(qobuz)", "（Qobuz）", "(Qobuz)"} {
 		s = strings.ReplaceAll(s, marker, "")
 	}
+	// Discogs-style artist disambiguators, e.g. "Indecision (2)", are not part of the artist name.
+	s = regexp.MustCompile(`\s*[（(]\d+[）)]\s*$`).ReplaceAllString(s, "")
 	return strings.TrimSpace(s)
 }
 

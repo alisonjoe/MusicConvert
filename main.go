@@ -9,13 +9,14 @@ import (
 	"MusicConvert/util"
 	"context"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"os"
 	"os/exec"
 	"os/signal"
+	"sync"
 	"syscall"
-	"time"
 
 	"github.com/fsnotify/fsnotify"
 )
@@ -25,21 +26,108 @@ var delChan = make(chan string, 1000)
 
 const buildVersion = "metadata-fix-v2-net-ease-album-order"
 
-func initLogFile() *os.File {
+const (
+	logMaxBytes = 100 * 1024 * 1024
+	logMaxFiles = 5
+)
+
+type rotatingLogWriter struct {
+	mu       sync.Mutex
+	path     string
+	maxBytes int64
+	maxFiles int
+	file     *os.File
+	size     int64
+}
+
+func newRotatingLogWriter(path string, maxBytes int64, maxFiles int) (*rotatingLogWriter, error) {
+	w := &rotatingLogWriter{path: path, maxBytes: maxBytes, maxFiles: maxFiles}
+	if err := w.open(); err != nil {
+		return nil, err
+	}
+	return w, nil
+}
+
+func (w *rotatingLogWriter) open() error {
+	file, err := os.OpenFile(w.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return err
+	}
+	info, err := file.Stat()
+	if err != nil {
+		file.Close()
+		return err
+	}
+	w.file = file
+	w.size = info.Size()
+	return nil
+}
+
+func (w *rotatingLogWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.file == nil {
+		if err := w.open(); err != nil {
+			return 0, err
+		}
+	}
+	if w.maxBytes > 0 && w.size+int64(len(p)) > w.maxBytes {
+		if err := w.rotate(); err != nil {
+			return 0, err
+		}
+	}
+	n, err := w.file.Write(p)
+	w.size += int64(n)
+	return n, err
+}
+
+func (w *rotatingLogWriter) rotate() error {
+	if w.file != nil {
+		w.file.Close()
+		w.file = nil
+	}
+	if w.maxFiles > 0 {
+		os.Remove(fmt.Sprintf("%s.%d", w.path, w.maxFiles))
+		for i := w.maxFiles - 1; i >= 1; i-- {
+			oldPath := fmt.Sprintf("%s.%d", w.path, i)
+			newPath := fmt.Sprintf("%s.%d", w.path, i+1)
+			if _, err := os.Stat(oldPath); err == nil {
+				os.Rename(oldPath, newPath)
+			}
+		}
+		if _, err := os.Stat(w.path); err == nil {
+			os.Rename(w.path, fmt.Sprintf("%s.1", w.path))
+		}
+	}
+	return w.open()
+}
+
+func (w *rotatingLogWriter) Close() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.file == nil {
+		return nil
+	}
+	err := w.file.Close()
+	w.file = nil
+	return err
+}
+
+func initLogFile() io.Closer {
 	logDir := "logs"
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		log.Printf("Warning: Failed to create log directory %s: %v", logDir, err)
 		return nil
 	}
-	logPath := "logs/MusicConvert-" + time.Now().Format("20060102-150405") + ".log"
-	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	logPath := "logs/MusicConvert.log"
+	writer, err := newRotatingLogWriter(logPath, logMaxBytes, logMaxFiles)
 	if err != nil {
 		log.Printf("Warning: Failed to open log file %s: %v", logPath, err)
 		return nil
 	}
-	log.SetOutput(io.MultiWriter(os.Stdout, file))
-	log.Printf("Log file: %s", logPath)
-	return file
+	log.SetOutput(io.MultiWriter(os.Stdout, writer))
+	log.Printf("Log file: %s (rotate at %d MB, keep %d files)", logPath, logMaxBytes/1024/1024, logMaxFiles)
+	return writer
 }
 
 func CheckEnvironment() {

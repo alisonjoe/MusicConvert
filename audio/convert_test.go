@@ -328,6 +328,13 @@ func TestSelectAlbumArtistPrefersChinesePathArtist(t *testing.T) {
 	}
 }
 
+func TestNormalizeArtistNameRemovesDiscogsDisambiguator(t *testing.T) {
+	got := normalizeArtistName("Indecision (2)")
+	if got != "Indecision" {
+		t.Fatalf("normalizeArtistName() = %q, want Indecision", got)
+	}
+}
+
 func TestPreferItunesAlbumNameRejectsDifferentBootlegVolume(t *testing.T) {
 	current := "The Bootleg Series Volumes 1-3 (Rare & Unreleased) 1961-1991"
 	got := preferItunesAlbumName(current, "The Bootleg Series, Vol. 9: The Witmark Demos: 1962-1964")
