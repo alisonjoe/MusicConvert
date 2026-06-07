@@ -335,6 +335,22 @@ func TestNormalizeArtistNameRemovesDiscogsDisambiguator(t *testing.T) {
 	}
 }
 
+func TestDiscDirIsNotCatalogOrClassical(t *testing.T) {
+	if isCatalogOnlyDir("Disc 1") {
+		t.Fatalf("Disc 1 should not be treated as catalog")
+	}
+	if meta := parseClassicalAlbumMetadata("DISC 1"); meta.IsClassical() {
+		t.Fatalf("DISC 1 should not be treated as classical metadata: %#v", meta)
+	}
+}
+
+func TestLooksLikeGenericMusicFolderDoesNotRejectMusicBoxAlbum(t *testing.T) {
+	album := "Leslie Cheung - Zhang Guo Rong Hao Jing Xuan + Music Box"
+	if looksLikeGenericMusicFolder(album) {
+		t.Fatalf("%q should not be generic", album)
+	}
+}
+
 func TestPreferItunesAlbumNameRejectsDifferentBootlegVolume(t *testing.T) {
 	current := "The Bootleg Series Volumes 1-3 (Rare & Unreleased) 1961-1991"
 	got := preferItunesAlbumName(current, "The Bootleg Series, Vol. 9: The Witmark Demos: 1962-1964")

@@ -234,7 +234,7 @@ func isDiscDir(name string) bool {
 
 func isCatalogOnlyDir(name string) bool {
 	name = strings.TrimSpace(name)
-	if name == "" {
+	if name == "" || isDiscDir(name) {
 		return false
 	}
 	return strings.TrimSpace(catalogPrefixPattern.ReplaceAllString(name, "")) == ""
@@ -590,8 +590,13 @@ func looksLikeGenericMusicFolder(name string) bool {
 	if !api.ContainsChinese(name) && !strings.Contains(name, " ") && !strings.Contains(name, ",") {
 		return true
 	}
-	genericTerms := []string{"import", "bootleg", "series", "album", "music", "disc", "disk", "cd", "vinyl"}
-	for _, term := range genericTerms {
+	exactGenericTerms := []string{"import", "album", "music", "disc", "disk", "cd", "vinyl"}
+	for _, term := range exactGenericTerms {
+		if name == term {
+			return true
+		}
+	}
+	for _, term := range []string{"bootleg", "series"} {
 		if strings.Contains(name, term) {
 			return true
 		}
@@ -926,7 +931,7 @@ func looksLikeClassicalWork(s string) bool {
 func parseClassicalAlbumMetadata(album string) classicalMetadata {
 	album = normalizeClassicalAlbumText(album)
 	var meta classicalMetadata
-	if matches := catalogPrefixPattern.FindStringSubmatch(album); len(matches) >= 2 {
+	if matches := catalogPrefixPattern.FindStringSubmatch(album); len(matches) >= 2 && !isDiscDir(matches[1]) {
 		meta.Catalog = strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(matches[1]), "_", "-"))
 	}
 	if matches := quotedClassicalPattern.FindStringSubmatch(album); len(matches) >= 3 {
