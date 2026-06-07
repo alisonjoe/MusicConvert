@@ -40,6 +40,12 @@ func TestLooksLikeRomanizedChineseQuery(t *testing.T) {
 	if !looksLikeRomanizedChineseQuery("Shi Hao Feng Qiu") {
 		t.Fatalf("expected romanized Chinese query")
 	}
+	if !looksLikeRomanizedChineseQuery("Chang Zai Xin Tou") {
+		t.Fatalf("expected romanized Chinese album query")
+	}
+	if !looksLikeRomanizedChineseQuery("Wo Yuan Yi") {
+		t.Fatalf("expected romanized Chinese title query")
+	}
 	if looksLikeRomanizedChineseQuery("Back To Black Series") {
 		t.Fatalf("English album title should not be treated as romanized Chinese")
 	}
