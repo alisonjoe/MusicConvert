@@ -579,7 +579,7 @@ func looksLikeRomanizedChineseQuery(s string) bool {
 		return false
 	}
 	pinyin := map[string]bool{
-		"ai": true, "an": true, "ba": true, "bai": true, "bei": true, "bu": true, "cai": true, "chang": true, "chen": true, "cheng": true, "de": true, "feng": true, "guo": true, "hao": true, "hong": true, "jian": true, "jing": true, "li": true, "liu": true, "mian": true, "nian": true, "rong": true, "shui": true, "si": true, "wu": true, "xin": true, "xuan": true, "yan": true, "yi": true, "you": true, "zhang": true,
+		"ai": true, "an": true, "ba": true, "bai": true, "bei": true, "bu": true, "cai": true, "chang": true, "chen": true, "cheng": true, "de": true, "feng": true, "guo": true, "hao": true, "hong": true, "jian": true, "jing": true, "li": true, "liu": true, "mian": true, "nian": true, "qiu": true, "rong": true, "shi": true, "shui": true, "si": true, "wu": true, "xin": true, "xuan": true, "yan": true, "yi": true, "you": true, "zhang": true,
 	}
 	matched := 0
 	for _, word := range words {
@@ -588,6 +588,71 @@ func looksLikeRomanizedChineseQuery(s string) bool {
 		}
 	}
 	return float64(matched)/float64(len(words)) >= 0.6
+}
+
+func asciiAlbumNamesClose(a, b string) bool {
+	clean := func(s string) string {
+		return strings.Map(func(r rune) rune {
+			if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+				return r
+			}
+			if r >= 'A' && r <= 'Z' {
+				return r + 32
+			}
+			return -1
+		}, s)
+	}
+	a, b = clean(a), clean(b)
+	if len(a) < 6 || len(b) < 6 {
+		return false
+	}
+	if strings.Contains(a, b) || strings.Contains(b, a) {
+		return true
+	}
+	maxLen := len(a)
+	if len(b) > maxLen {
+		maxLen = len(b)
+	}
+	return levenshteinDistance(a, b) <= 2 || float64(levenshteinDistance(a, b))/float64(maxLen) <= 0.2
+}
+
+func levenshteinDistance(a, b string) int {
+	if a == b {
+		return 0
+	}
+	if len(a) == 0 {
+		return len(b)
+	}
+	if len(b) == 0 {
+		return len(a)
+	}
+	prev := make([]int, len(b)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+	for i := 1; i <= len(a); i++ {
+		cur := make([]int, len(b)+1)
+		cur[0] = i
+		for j := 1; j <= len(b); j++ {
+			cost := 0
+			if a[i-1] != b[j-1] {
+				cost = 1
+			}
+			cur[j] = minInt(cur[j-1]+1, prev[j]+1, prev[j-1]+cost)
+		}
+		prev = cur
+	}
+	return prev[len(b)]
+}
+
+func minInt(values ...int) int {
+	min := values[0]
+	for _, value := range values[1:] {
+		if value < min {
+			min = value
+		}
+	}
+	return min
 }
 
 func resolveAlbumTrackNumber(albumID int, artist, album, title string, fallbackTrack, fallbackTotal int) (int, int) {
@@ -689,6 +754,8 @@ func searchSongAndMatch(query, targetTitle, targetArtist, albumHint string, pref
 		if hasHint {
 			if albumName == hint {
 				albumScore = 1.0 // 精确匹配最高分
+			} else if asciiAlbumNamesClose(albumName, hint) {
+				albumScore = 0.85
 			} else if strings.Contains(albumName, hint) {
 				albumScore = 0.6
 			} else if strings.Contains(hint, albumName) {

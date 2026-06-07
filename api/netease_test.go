@@ -37,7 +37,19 @@ func TestLooksLikeRomanizedChineseQuery(t *testing.T) {
 	if !looksLikeRomanizedChineseQuery("Wu Xin Shui Mian") {
 		t.Fatalf("expected romanized Chinese query")
 	}
+	if !looksLikeRomanizedChineseQuery("Shi Hao Feng Qiu") {
+		t.Fatalf("expected romanized Chinese query")
+	}
 	if looksLikeRomanizedChineseQuery("Back To Black Series") {
 		t.Fatalf("English album title should not be treated as romanized Chinese")
+	}
+}
+
+func TestASCIIAlbumNamesClose(t *testing.T) {
+	if !asciiAlbumNamesClose("Cross Over", "Cross Cover") {
+		t.Fatalf("expected typo-tolerant album match")
+	}
+	if asciiAlbumNamesClose("Cross Over", "Hot Summer") {
+		t.Fatalf("unrelated album names should not match")
 	}
 }
