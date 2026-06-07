@@ -158,6 +158,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize configuration: %v", err)
 	}
+	conf.SrcPath = util.ResolveExistingPath(conf.SrcPath)
 	log.Printf("config: %s", config.Summary())
 	log.Printf("Netease auth mode: %s (openapi app configured: %t, cookie configured: %t)",
 		config.GetNeteaseAuthMode(), config.HasNeteaseOpenAPIConfig(), config.GetNeteaseCookie() != "")

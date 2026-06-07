@@ -7,7 +7,79 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
 )
+
+func foldPathNameForCompare(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	accented := map[rune]rune{
+		'á': 'a', 'à': 'a', 'â': 'a', 'ä': 'a', 'ã': 'a', 'å': 'a', 'ā': 'a', 'ă': 'a', 'ą': 'a',
+		'ç': 'c', 'ć': 'c', 'č': 'c',
+		'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e', 'ē': 'e', 'ė': 'e', 'ę': 'e',
+		'í': 'i', 'ì': 'i', 'î': 'i', 'ï': 'i', 'ī': 'i',
+		'ñ': 'n', 'ń': 'n',
+		'ó': 'o', 'ò': 'o', 'ô': 'o', 'ö': 'o', 'õ': 'o', 'ø': 'o', 'ō': 'o',
+		'ú': 'u', 'ù': 'u', 'û': 'u', 'ü': 'u', 'ū': 'u',
+		'ý': 'y', 'ÿ': 'y', 'š': 's', 'ž': 'z', 'ř': 'r', 'ł': 'l',
+	}
+	return strings.Map(func(r rune) rune {
+		if unicode.Is(unicode.Mn, r) || unicode.Is(unicode.Cf, r) {
+			return -1
+		}
+		if folded, ok := accented[r]; ok {
+			return folded
+		}
+		return r
+	}, s)
+}
+
+func ResolveExistingPath(path string) string {
+	if path == "" {
+		return path
+	}
+	if _, err := os.Stat(path); err == nil {
+		return path
+	}
+	cleaned := filepath.Clean(path)
+	volume := filepath.VolumeName(cleaned)
+	rest := strings.TrimPrefix(cleaned, volume)
+	absolute := strings.HasPrefix(rest, string(os.PathSeparator))
+	parts := strings.Split(strings.Trim(rest, string(os.PathSeparator)), string(os.PathSeparator))
+	current := volume
+	if absolute {
+		current += string(os.PathSeparator)
+	}
+	for _, part := range parts {
+		if part == "" || part == "." {
+			continue
+		}
+		next := filepath.Join(current, part)
+		if _, err := os.Stat(next); err == nil {
+			current = next
+			continue
+		}
+		entries, err := os.ReadDir(current)
+		if err != nil {
+			return path
+		}
+		want := foldPathNameForCompare(part)
+		matched := ""
+		for _, entry := range entries {
+			if foldPathNameForCompare(entry.Name()) == want {
+				matched = entry.Name()
+				break
+			}
+		}
+		if matched == "" {
+			return path
+		}
+		current = filepath.Join(current, matched)
+	}
+	if current != path {
+		log.Printf("[Path Normalize] Resolved configured path %q -> %q", path, current)
+	}
+	return current
+}
 
 func visit(files *[]string) filepath.WalkFunc {
 	return func(path string, info os.FileInfo, err error) error {
@@ -92,6 +164,7 @@ func DelSrc(isDel model.SwitchState, ch chan string) {
 
 func GetAllMusic(path string, ch chan model.MusicFileInfo) {
 	var files []string
+	path = ResolveExistingPath(path)
 	err := filepath.Walk(path, visit(&files))
 	if err != nil {
 		log.Printf("GetAllMusic walk error: %v", err)
