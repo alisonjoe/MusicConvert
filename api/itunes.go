@@ -20,6 +20,7 @@ type ItunesMeta struct {
 	CollectionName string
 	Date           string
 	DiscTotal      int
+	CollectionID   int64
 }
 
 type ItunesSearchResp struct {
@@ -29,6 +30,7 @@ type ItunesSearchResp struct {
 		CollectionName   string `json:"collectionName"`
 		ReleaseDate      string `json:"releaseDate"`
 		DiscCount        int    `json:"discCount"`
+		CollectionID     int64  `json:"collectionId"`
 	} `json:"results"`
 }
 
@@ -155,6 +157,7 @@ func fetchItunesMetaForQuery(query, contextLabel string) ItunesMeta {
 		meta.AlbumArtist = r.ArtistName
 		meta.CollectionName = r.CollectionName
 		meta.DiscTotal = r.DiscCount
+		meta.CollectionID = r.CollectionID
 		if len(r.ReleaseDate) >= 4 {
 			meta.Date = r.ReleaseDate[:4] // 提取 YYYY
 		}
@@ -164,4 +167,54 @@ func fetchItunesMetaForQuery(query, contextLabel string) ItunesMeta {
 		log.Printf("[iTunes Candidates] none for %s", contextLabel)
 	}
 	return meta
+}
+
+type ItunesLookupResp struct {
+	Results []struct {
+		WrapperType    string `json:"wrapperType"`
+		Kind           string `json:"kind"`
+		TrackName      string `json:"trackName"`
+		TrackNumber    int    `json:"trackNumber"`
+		CollectionName string `json:"collectionName"`
+	} `json:"results"`
+}
+
+func FetchItunesAlbumTrackTitles(artist, album string) (map[int]string, string) {
+	tracks := make(map[int]string)
+	meta := FetchItunesMeta(artist, album)
+	if meta.CollectionID <= 0 {
+		return tracks, "empty: itunes album id not found"
+	}
+	apiURL := fmt.Sprintf("https://itunes.apple.com/lookup?id=%d&entity=song", meta.CollectionID)
+	log.Printf("[iTunes Album Tracks] URL: %s", apiURL)
+	resp, err := itunesClient.Get(apiURL)
+	if err != nil {
+		log.Printf("[iTunes Album Tracks] error: %v", err)
+		return tracks, "empty: " + err.Error()
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		log.Printf("[iTunes Album Tracks] http status=%d", resp.StatusCode)
+		return tracks, fmt.Sprintf("empty: http status=%d", resp.StatusCode)
+	}
+	var res ItunesLookupResp
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		log.Printf("[iTunes Album Tracks] decode failed: %v", err)
+		return tracks, "empty: " + err.Error()
+	}
+	for _, item := range res.Results {
+		if item.WrapperType != "track" || item.TrackName == "" {
+			continue
+		}
+		trackNo := item.TrackNumber
+		if trackNo <= 0 {
+			trackNo = len(tracks) + 1
+		}
+		tracks[trackNo] = item.TrackName
+	}
+	if len(tracks) == 0 {
+		return tracks, "empty: itunes lookup has no songs"
+	}
+	log.Printf("[iTunes Album Tracks] album=%s id=%d tracks=%d", meta.CollectionName, meta.CollectionID, len(tracks))
+	return tracks, "itunes"
 }

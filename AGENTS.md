@@ -86,7 +86,7 @@
 ## 元数据来源优先级
 - MusicBrainz 是西文音乐的主要外部来源。
 - 网易云更适合中文发行和歌词 / 曲目表兜底，但西文专辑上可能很噪；封面补充必须先通过 artist + album 校验，不能只按 album 搜索第一项。
-- iTunes 主要用于专辑级补充和标准专辑名，不应该当唯一权威；只有候选专辑与当前上下文精确匹配或明确 deluxe/edition 变体时才采用其 AlbumArtist / CollectionName，避免被搜索结果第一项或仅包含同名词的专辑污染；当前专辑艺术家已有中文名时，不用 iTunes 英文名覆盖。
+- iTunes 主要用于专辑级补充和标准专辑名，不应该当唯一权威；只有候选专辑与当前上下文精确匹配或明确 deluxe/edition 变体时才采用其 AlbumArtist / CollectionName，避免被搜索结果第一项或仅包含同名词的专辑污染；当前专辑艺术家已有中文名时，不用 iTunes 英文名覆盖；网易专辑曲目不可用时，可用已校验 iTunes 专辑的 lookup 曲目作为缺失曲目和拼音还原兜底。
 - Spotify 是可选项，只有在凭证和 API 行为确认可用时才用。
 - 对于像 `Track01.wav` 这种泛化文件名，不要在没有足够专辑上下文时进行大范围外网搜索；若已有强专辑上下文但本地 artist 为 Unknown，MusicBrainz 可用标题 + 专辑匹配补全 artist；最终仍无法解析出非泛化曲名时跳过转换并记录日志，避免输出 `TrackNN` 成品。
 

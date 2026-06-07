@@ -2,6 +2,7 @@ package api
 
 import (
 	"MusicConvert/config"
+	"MusicConvert/util"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -251,6 +252,9 @@ func GetAlbumTrackTitlesWithSource(artist, album string) (map[int]string, string
 
 	albumID := FindAlbumID(artist, album)
 	if albumID <= 0 {
+		if itunesTracks, source := FetchItunesAlbumTrackTitles(artist, album); len(itunesTracks) > 0 {
+			return itunesTracks, source
+		}
 		return tracks, "empty: album id not found"
 	}
 	legacyAuth := "anonymous"
@@ -271,6 +275,9 @@ func GetAlbumTrackTitlesWithSource(artist, album string) (map[int]string, string
 		}
 	}
 	if len(tracks) == 0 {
+		if itunesTracks, source := FetchItunesAlbumTrackTitles(artist, album); len(itunesTracks) > 0 {
+			return itunesTracks, source
+		}
 		return tracks, "empty: album detail has no songs"
 	}
 	return tracks, "netease"
@@ -560,7 +567,7 @@ type MatchScore struct {
 }
 
 func normalizeSongName(s string) string {
-	s = strings.ToLower(strings.TrimSpace(s))
+	s = util.ToSimplifiedChinese(strings.ToLower(strings.TrimSpace(s)))
 	remove := " \t\r\n　-_.·・,，.。:：;；!！?？'\"“”‘’()（）[]【】{}《》<>〈〉"
 	return strings.Map(func(r rune) rune {
 		if strings.ContainsRune(remove, r) {
