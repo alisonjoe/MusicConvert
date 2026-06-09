@@ -6,6 +6,13 @@ import (
 	"testing"
 )
 
+func TestSanitizeFilenameRemovesControlCharacters(t *testing.T) {
+	got := SanitizeFilename("Dark\x1bness")
+	if got != "Darkness" {
+		t.Fatalf("SanitizeFilename() = %q, want Darkness", got)
+	}
+}
+
 func TestResolveExistingPathFoldsCombiningAccent(t *testing.T) {
 	dir := t.TempDir()
 	existing := filepath.Join(dir, "Celine Dion")

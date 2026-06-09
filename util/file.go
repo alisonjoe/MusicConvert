@@ -206,6 +206,12 @@ func splitFiles(files []string) map[string]model.MusicFileInfo {
 
 // SanitizeFilename removes invalid characters from a string to make it safe for use as a filename.
 func SanitizeFilename(filename string) string {
+	filename = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
+			return -1
+		}
+		return r
+	}, filename)
 	// Replace common invalid characters with a hyphen
 	filename = strings.ReplaceAll(filename, "/", "-")
 	filename = strings.ReplaceAll(filename, "\\", "-")

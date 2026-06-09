@@ -350,6 +350,15 @@ func TestGreatestHitsColonAlbumIsNotClassical(t *testing.T) {
 	}
 }
 
+func TestValidateOutputIdentityRejectsShortNameGarbage(t *testing.T) {
+	if err := validateOutputIdentity("MBF14M~I", "Darkness"); err == nil {
+		t.Fatalf("expected garbage artist to be rejected")
+	}
+	if err := validateOutputIdentity("Mono Inc.", "MBF14M~I"); err == nil {
+		t.Fatalf("expected garbage album to be rejected")
+	}
+}
+
 func TestLooksLikeGenericMusicFolderDoesNotRejectMusicBoxAlbum(t *testing.T) {
 	album := "Leslie Cheung - Zhang Guo Rong Hao Jing Xuan + Music Box"
 	if looksLikeGenericMusicFolder(album) {

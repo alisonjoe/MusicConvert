@@ -774,6 +774,32 @@ func albumDirName(album, year string) string {
 	return fmt.Sprintf("%s [%s]", album, year)
 }
 
+func looksLikeGarbageOutputName(name string) bool {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return true
+	}
+	if regexp.MustCompile(`(?i)^[a-z0-9]{5,8}~[a-z0-9]$`).MatchString(name) {
+		return true
+	}
+	for _, r := range name {
+		if r < 32 || r == 127 {
+			return true
+		}
+	}
+	return false
+}
+
+func validateOutputIdentity(artist, album string) error {
+	if looksLikeUnknownArtist(artist) || looksLikeGarbageOutputName(artist) {
+		return fmt.Errorf("%w: invalid output artist=%q album=%q", errSkipNoTrackMetadata, artist, album)
+	}
+	if album == "" || album == "Unknown Album" || looksLikeGarbageOutputName(album) {
+		return fmt.Errorf("%w: invalid output album=%q artist=%q", errSkipNoTrackMetadata, album, artist)
+	}
+	return nil
+}
+
 func cleanSourceQualifier(s string) string {
 	s = strings.TrimSpace(s)
 	for _, marker := range []string{"（qobuz）", "(qobuz)", "（Qobuz）", "(Qobuz)"} {
@@ -1945,9 +1971,13 @@ PROCESS_PATH:
 	if discCount < 1 {
 		discCount = 1
 	}
+	if err := validateOutputIdentity(finalMainArtist, officialAlbum); err != nil {
+		return err
+	}
 	dirYear := albumDirectoryYear(sourceAlbumDir, origAlbum, officialAlbum, itunesMeta.Date, neteaseYear, meta.GetTag("RELEASEDATE"), meta.GetTag("DATE"), meta.GetTag("YEAR"), meta.GetTag("ORIGINALDATE"), meta.GetTag("ORIGINALYEAR"))
 	albumPath := albumOutputPath(outRoot, finalMainArtist, officialAlbum, dirYear)
 	basePath := discOutputPath(albumPath, discNum, discCount)
+	log.Printf("[Output Path] %s", basePath)
 	util.MkPathIfNotExists(basePath)
 	var trackTitles map[int]string
 	trackTitleSource := ""
@@ -2179,9 +2209,13 @@ PROCESS_CUE:
 	if discCount < 1 {
 		discCount = 1
 	}
+	if err := validateOutputIdentity(finalMainArtist, officialAlbum); err != nil {
+		return err
+	}
 	dirYear := albumDirectoryYear(sourceAlbumDir, cueAlbumTitle, officialAlbum, cueSheet.Rem["DATE"], cueSheet.Rem["YEAR"], itunesMeta.Date, neteaseYear, cueSheet.Rem["RELEASEDATE"], meta.GetTag("RELEASEDATE"), meta.GetTag("DATE"), meta.GetTag("YEAR"), cueSheet.Rem["ORIGINALDATE"], cueSheet.Rem["ORIGINALYEAR"], meta.GetTag("ORIGINALDATE"), meta.GetTag("ORIGINALYEAR"))
 	albumPath := albumOutputPath(outRoot, finalMainArtist, officialAlbum, dirYear)
 	basePath := discOutputPath(albumPath, discNum, discCount)
+	log.Printf("[Output Path] %s", basePath)
 	util.MkPathIfNotExists(basePath)
 	var onlineTrackTitles map[int]string
 	onlineTrackTitleSource := ""
