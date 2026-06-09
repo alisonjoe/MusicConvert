@@ -940,7 +940,7 @@ func parseClassicalAlbumMetadata(album string) classicalMetadata {
 		if meta.Catalog != "" {
 			meta.Composer = strings.TrimSpace(catalogPrefixPattern.ReplaceAllString(meta.Composer, ""))
 		}
-	} else if matches := colonClassicalPattern.FindStringSubmatch(album); len(matches) >= 3 {
+	} else if matches := colonClassicalPattern.FindStringSubmatch(album); len(matches) >= 3 && (meta.Catalog != "" || looksLikeClassicalWork(matches[2])) {
 		meta.Composer = strings.Trim(strings.TrimSpace(matches[1]), " -_.。")
 		meta.Work = strings.TrimSpace(matches[2])
 		if meta.Catalog != "" {

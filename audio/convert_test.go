@@ -344,6 +344,12 @@ func TestDiscDirIsNotCatalogOrClassical(t *testing.T) {
 	}
 }
 
+func TestGreatestHitsColonAlbumIsNotClassical(t *testing.T) {
+	if meta := parseClassicalAlbumMetadata("In Dreams: The Greatest Hits"); meta.IsClassical() {
+		t.Fatalf("greatest hits album should not be treated as classical: %#v", meta)
+	}
+}
+
 func TestLooksLikeGenericMusicFolderDoesNotRejectMusicBoxAlbum(t *testing.T) {
 	album := "Leslie Cheung - Zhang Guo Rong Hao Jing Xuan + Music Box"
 	if looksLikeGenericMusicFolder(album) {
