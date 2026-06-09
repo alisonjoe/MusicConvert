@@ -24,7 +24,7 @@ import (
 var convertChan = make(chan model.MusicFileInfo, 1000)
 var delChan = make(chan string, 1000)
 
-const buildVersion = "metadata-fix-v3-output-guard"
+const buildVersion = "metadata-fix-v4-smb-safe-paths"
 
 const (
 	logMaxBytes = 100 * 1024 * 1024

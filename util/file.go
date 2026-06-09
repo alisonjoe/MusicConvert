@@ -223,9 +223,14 @@ func SanitizeFilename(filename string) string {
 	filename = strings.ReplaceAll(filename, ">", "-")
 	filename = strings.ReplaceAll(filename, "|", "-")
 
-	// Replace multiple spaces with a single space, then trim leading/trailing spaces
+	// Replace multiple spaces with a single space, then trim leading/trailing spaces.
+	// Also trim trailing dots: SMB/Windows clients can expose names like "Mono Inc." as 8.3 aliases (e.g. MBF14M~I).
 	filename = strings.Join(strings.Fields(filename), " ")
 	filename = strings.TrimSpace(filename)
+	filename = strings.TrimRight(filename, " .")
+	if filename == "" {
+		return "Unknown"
+	}
 
 	return filename
 }

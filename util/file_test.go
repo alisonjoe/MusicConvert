@@ -13,6 +13,13 @@ func TestSanitizeFilenameRemovesControlCharacters(t *testing.T) {
 	}
 }
 
+func TestSanitizeFilenameTrimsTrailingDotForSMB(t *testing.T) {
+	got := SanitizeFilename("Mono Inc.")
+	if got != "Mono Inc" {
+		t.Fatalf("SanitizeFilename() = %q, want Mono Inc", got)
+	}
+}
+
 func TestResolveExistingPathFoldsCombiningAccent(t *testing.T) {
 	dir := t.TempDir()
 	existing := filepath.Join(dir, "Celine Dion")
