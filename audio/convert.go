@@ -80,8 +80,8 @@ func collectAllTags(meta *AutoMetadata, cueSheet *CueSheet, cueTrack *Track, net
 			tags[k] = v
 		}
 	}
-	if neteaseYear != "" && tags["DATE"] == "" {
-		tags["DATE"] = neteaseYear
+	if neteaseYear != "" && tags["YEAR"] == "" {
+		tags["YEAR"] = neteaseYear
 	}
 	return tags
 }
@@ -123,6 +123,12 @@ func enrichWithItunesAndStandardize(tags map[string]string, itunesMeta api.Itune
 		if tags["ORIGINALYEAR"] == "" {
 			tags["ORIGINALYEAR"] = tags["DATE"]
 		}
+	}
+
+	// Prefer album year (ORIGINALYEAR) for the YEAR tag when available
+	if oy := tags["ORIGINALYEAR"]; oy != "" {
+		// Override YEAR with ORIGINALYEAR regardless of existing value
+		tags["YEAR"] = oy
 	}
 
 	// 清洗所有标签中的垃圾信息
