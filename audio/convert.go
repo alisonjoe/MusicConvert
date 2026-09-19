@@ -13,7 +13,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -38,27 +37,9 @@ var (
 	instrumentalistAfterPunctuationPat = regexp.MustCompile(`[。；;，,]([^。；;，,「」]+?)(钢琴|小提琴|大提琴|吉他|古筝|琵琶|长笛|单簧管|双簧管|萨克斯|竖琴|风琴|管风琴)`)
 )
 
-type classicalMetadata struct {
-	Catalog            string
-	Composer           string
-	Work               string
-	Conductor          string
-	Ensemble           string
-	CanonicalOrchestra string
-	Performer          string
-	Instrument         string
-}
 
-var classicalAliases = map[string]string{
-	"史特拉汶斯基": "Igor Stravinsky",
-	"斯特拉文斯基": "Igor Stravinsky",
-	"春之祭":    "Le Sacre du printemps",
-	"火鸟":     "The Firebird",
-	"火鳥":     "The Firebird",
-	"彼得洛希卡":  "Petrushka",
-	"戴维斯":    "Colin Davis",
-	"戴維斯":    "Colin Davis",
-}
+
+
 
 // collectAllTags merges tags from ffprobe, CUE sheet, and Netease API
 func collectAllTags(meta *AutoMetadata, cueSheet *CueSheet, cueTrack *Track, neteaseYear string) map[string]string {
@@ -139,47 +120,11 @@ func enrichWithItunesAndStandardize(tags map[string]string, itunesMeta api.Itune
 	log.Printf("[Metadata Scraping] 最终注入标签(Disc %d/%d Track %d/%d): %#v", discNum, discCount, trackNum, totalTracks, tags)
 }
 
-func normalizeTrackNumber(trackNum, fallback int) int {
-	if fallback > 1 && trackNum <= 1 {
-		return fallback
-	}
-	if trackNum > 0 {
-		return trackNum
-	}
-	if fallback > 0 {
-		return fallback
-	}
-	return 1
-}
 
-func normalizeTrackTotal(totalTracks, fallback int) int {
-	if totalTracks > 0 {
-		return totalTracks
-	}
-	if fallback > 0 {
-		return fallback
-	}
-	return 1
-}
 
-func inferOriginalTrackNumber(meta *AutoMetadata, title, filename string) int {
-	for _, key := range []string{"TRACKNUMBER", "TRACK", "track"} {
-		if trackTag := meta.GetTag(key); trackTag != "" {
-			if n := parseTrackNumberTag(trackTag); n > 0 {
-				return n
-			}
-		}
-	}
-	for _, candidate := range []string{filename, title} {
-		if n := parseLeadingTrackNumber(candidate); n > 0 {
-			return n
-		}
-		if n := parseTrackNumberFromFilename(candidate); n > 0 {
-			return n
-		}
-	}
-	return 0
-}
+
+
+
 
 func outputExtFor(inputExt string) string {
 	if strings.EqualFold(inputExt, ".mp3") {
@@ -188,266 +133,37 @@ func outputExtFor(inputExt string) string {
 	return ".flac"
 }
 
-func parseTrackNumberTag(trackTag string) int {
-	if idx := strings.Index(trackTag, "/"); idx > 0 {
-		trackTag = trackTag[:idx]
-	}
-	trackTag = strings.TrimSpace(trackTag)
-	if n, err := strconv.Atoi(trackTag); err == nil && n > 0 {
-		return n
-	}
-	return 0
-}
 
-func parseDiscNumberTag(discTag string) int {
-	if idx := strings.Index(discTag, "/"); idx > 0 {
-		discTag = discTag[:idx]
-	}
-	discTag = strings.TrimSpace(discTag)
-	if n, err := strconv.Atoi(discTag); err == nil && n > 0 {
-		return n
-	}
-	return 0
-}
 
-func discNumberFromName(name string) int {
-	name = strings.ToLower(strings.TrimSpace(name))
-	for _, prefix := range []string{"cd", "disc", "disk"} {
-		if strings.HasPrefix(name, prefix) {
-			rest := strings.TrimSpace(strings.TrimPrefix(name, prefix))
-			rest = strings.Trim(rest, " -_.")
-			if n := parseLeadingTrackNumber(rest); n > 0 {
-				return n
-			}
-		}
-	}
-	if strings.Contains(name, "vinyl") || strings.Contains(name, "cd") || strings.Contains(name, "disc") || strings.Contains(name, "disk") {
-		fields := strings.FieldsFunc(name, func(r rune) bool {
-			return r < '0' || r > '9'
-		})
-		for i := len(fields) - 1; i >= 0; i-- {
-			if n, err := strconv.Atoi(fields[i]); err == nil && n > 0 && n < 100 {
-				return n
-			}
-		}
-	}
-	return 0
-}
 
-func isDiscDir(name string) bool {
-	return discNumberFromName(name) > 0
-}
 
-func isCatalogOnlyDir(name string) bool {
-	name = strings.TrimSpace(name)
-	if name == "" || isDiscDir(name) {
-		return false
-	}
-	return strings.TrimSpace(catalogPrefixPattern.ReplaceAllString(name, "")) == ""
-}
 
-func sourceAlbumDirName(filePath string) string {
-	parent := filepath.Base(filepath.Dir(filePath))
-	if isDiscDir(parent) || isCatalogOnlyDir(parent) {
-		grandParent := filepath.Base(filepath.Dir(filepath.Dir(filePath)))
-		if grandParent != "." && grandParent != string(os.PathSeparator) && !looksLikeGenericMusicFolder(grandParent) {
-			return grandParent
-		}
-	}
-	return parent
-}
 
-func catalogSiblingDirs(filePath string) []string {
-	parent := filepath.Base(filepath.Dir(filePath))
-	if !isCatalogOnlyDir(parent) {
-		return nil
-	}
-	albumDir := filepath.Dir(filepath.Dir(filePath))
-	entries, err := os.ReadDir(albumDir)
-	if err != nil {
-		return nil
-	}
-	var dirs []string
-	for _, entry := range entries {
-		if entry.IsDir() && isCatalogOnlyDir(entry.Name()) {
-			dirs = append(dirs, entry.Name())
-		}
-	}
-	sort.Strings(dirs)
-	return dirs
-}
 
-func catalogDiscNumberFromSource(filePath string) int {
-	parent := filepath.Base(filepath.Dir(filePath))
-	for i, dir := range catalogSiblingDirs(filePath) {
-		if dir == parent {
-			return i + 1
-		}
-	}
-	return 0
-}
 
-func sourceCatalog(filePath string) string {
-	parent := filepath.Base(filepath.Dir(filePath))
-	if isCatalogOnlyDir(parent) {
-		return strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(parent), "_", "-"))
-	}
-	return ""
-}
 
-func discNumberFromSource(meta *AutoMetadata, filePath string) int {
-	for _, key := range []string{"DISCNUMBER", "DISC", "disc"} {
-		if n := parseDiscNumberTag(meta.GetTag(key)); n > 0 {
-			return n
-		}
-	}
-	if n := parseDiscNumberTag(filepath.Base(filepath.Dir(filePath))); n > 0 && !isCatalogOnlyDir(filepath.Base(filepath.Dir(filePath))) {
-		return n
-	}
-	if n := catalogDiscNumberFromSource(filePath); n > 0 {
-		return n
-	}
-	return 1
-}
 
-func sourceDiscCount(filePath string) int {
-	parent := filepath.Base(filepath.Dir(filePath))
-	if isCatalogOnlyDir(parent) {
-		if dirs := catalogSiblingDirs(filePath); len(dirs) > 0 {
-			return len(dirs)
-		}
-		return 1
-	}
-	if !isDiscDir(parent) {
-		return 1
-	}
-	albumDir := filepath.Dir(filepath.Dir(filePath))
-	entries, err := os.ReadDir(albumDir)
-	if err != nil {
-		return 1
-	}
-	maxDisc := 1
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		if n := discNumberFromName(entry.Name()); n > maxDisc {
-			maxDisc = n
-		}
-	}
-	return maxDisc
-}
 
-func sourceDiscTrackCount(filePath string) int {
-	return trackCountInDir(filepath.Dir(filePath))
-}
 
-func trackCountInDir(dir string) int {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return 0
-	}
-	count := 0
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		ext := strings.ToUpper(filepath.Ext(entry.Name()))
-		if _, ok := model.NeedConvertSuffix[ext]; ok && ext != ".CUE" {
-			count++
-		}
-	}
-	return count
-}
 
-func sourceDiscTrackOffset(filePath string) int {
-	parent := filepath.Base(filepath.Dir(filePath))
-	albumDir := filepath.Dir(filepath.Dir(filePath))
-	var siblings []string
-	if isCatalogOnlyDir(parent) {
-		siblings = catalogSiblingDirs(filePath)
-	} else if isDiscDir(parent) {
-		entries, err := os.ReadDir(albumDir)
-		if err != nil {
-			return 0
-		}
-		for _, entry := range entries {
-			if entry.IsDir() && isDiscDir(entry.Name()) {
-				siblings = append(siblings, entry.Name())
-			}
-		}
-		sort.Slice(siblings, func(i, j int) bool { return discNumberFromName(siblings[i]) < discNumberFromName(siblings[j]) })
-	}
-	if len(siblings) == 0 {
-		return 0
-	}
-	offset := 0
-	for _, sibling := range siblings {
-		if sibling == parent {
-			return offset
-		}
-		offset += trackCountInDir(filepath.Join(albumDir, sibling))
-	}
-	return 0
-}
 
-func remapTrackTitlesForSource(filePath string, tracks map[int]string) map[int]string {
-	if len(tracks) == 0 {
-		return tracks
-	}
-	offset := sourceDiscTrackOffset(filePath)
-	if offset <= 0 {
-		return tracks
-	}
-	count := sourceDiscTrackCount(filePath)
-	if count <= 0 {
-		return tracks
-	}
-	remapped := make(map[int]string)
-	for i := 1; i <= count; i++ {
-		if title := strings.TrimSpace(tracks[offset+i]); title != "" {
-			remapped[i] = title
-		}
-	}
-	if len(remapped) == 0 {
-		return nil
-	}
-	return remapped
-}
 
-func sourceDiscTrackTitles(filePath string) map[int]string {
-	entries, err := os.ReadDir(filepath.Dir(filePath))
-	if err != nil {
-		return nil
-	}
-	tracks := make(map[int]string)
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		ext := strings.ToUpper(filepath.Ext(entry.Name()))
-		if _, ok := model.NeedConvertSuffix[ext]; !ok || ext == ".CUE" {
-			continue
-		}
-		base := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
-		trackNo := parseTrackNumberFromFilename(entry.Name())
-		if trackNo <= 0 {
-			continue
-		}
-		title := strings.TrimSpace(base)
-		if idx := strings.LastIndex(title, " - "); idx >= 0 {
-			title = strings.TrimSpace(title[idx+3:])
-		}
-		title = strings.TrimLeft(title, "0123456789. -_")
-		if title != "" && !looksLikeGenericTrackTitle(title) {
-			tracks[trackNo] = util.ToSimplifiedChinese(title)
-		}
-	}
-	if len(tracks) == 0 {
-		return nil
-	}
-	return tracks
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 func cueAlbumTitleAndDisc(title string) (string, int) {
 	title = strings.TrimSpace(title)
@@ -588,30 +304,7 @@ func selectAlbumArtist(meta *AutoMetadata, filePath, origArtist, officialArtist 
 	return "Unknown Artist"
 }
 
-func looksLikeGenericMusicFolder(name string) bool {
-	name = strings.ToLower(strings.TrimSpace(name))
-	if name == "" {
-		return true
-	}
-	if !api.ContainsChinese(name) && !strings.Contains(name, " ") && !strings.Contains(name, ",") {
-		return true
-	}
-	exactGenericTerms := []string{"import", "album", "music", "disc", "disk", "cd", "vinyl"}
-	for _, term := range exactGenericTerms {
-		if name == term {
-			return true
-		}
-	}
-	for _, term := range []string{"bootleg", "series"} {
-		if strings.Contains(name, term) {
-			return true
-		}
-	}
-	if strings.Contains(name, "philips") || strings.Contains(name, "首版系列") || strings.Contains(name, "纸盒") {
-		return true
-	}
-	return false
-}
+
 
 func firstYear(values ...string) string {
 	for _, value := range values {
@@ -740,25 +433,9 @@ func preferItunesAlbumArtist(currentArtist, itunesArtist string) string {
 	return simplifyMetadataText(primaryAlbumArtist(itunesArtist))
 }
 
-func albumDirectoryYear(sourceAlbumDir, originalAlbum, finalAlbum string, fallbackValues ...string) string {
-	sourceYear := ""
-	if albumNamesSimilar(sourceAlbumDir, finalAlbum) || albumNamesSimilar(originalAlbum, finalAlbum) {
-		sourceYear = firstYear(sourceAlbumDir, originalAlbum)
-	}
-	values := []string{sourceYear}
-	values = append(values, fallbackValues...)
-	return firstYear(values...)
-}
 
-func cueAlbumContext(albumHint, sourceAlbumDir, cueTitle string) string {
-	for _, candidate := range []string{albumHint, sourceAlbumDir, cueTitle} {
-		candidate = api.CleanHint(candidate)
-		if candidate != "" && candidate != "Unknown Album" {
-			return candidate
-		}
-	}
-	return ""
-}
+
+
 
 func constrainCueAlbumToContext(officialAlbum, contextAlbum string) string {
 	if contextAlbum == "" || officialAlbum == "" || officialAlbum == "Unknown Album" {
@@ -806,33 +483,9 @@ func validateOutputIdentity(artist, album string) error {
 	return nil
 }
 
-func cleanSourceQualifier(s string) string {
-	s = strings.TrimSpace(s)
-	for _, marker := range []string{"（qobuz）", "(qobuz)", "（Qobuz）", "(Qobuz)"} {
-		s = strings.ReplaceAll(s, marker, "")
-	}
-	// Discogs-style artist disambiguators, e.g. "Indecision (2)", are not part of the artist name.
-	s = regexp.MustCompile(`\s*[（(]\d+[）)]\s*$`).ReplaceAllString(s, "")
-	return strings.TrimSpace(s)
-}
 
-func cleanClassicalNameNoise(s string) string {
-	s = strings.TrimSpace(s)
-	runes := []rune(s)
-	i := 0
-	for i < len(runes) && runes[i] >= '0' && runes[i] <= '9' {
-		i++
-	}
-	j := i
-	for j < len(runes) && strings.ContainsRune("_ -.", runes[j]) {
-		j++
-	}
-	if i > 0 && j < len(runes) && runes[j] >= 0x4e00 && runes[j] <= 0x9fff && runes[j] != '首' {
-		s = strings.TrimSpace(string(runes[j:]))
-	}
-	s = strings.Trim(s, " :：")
-	return s
-}
+
+
 
 func normalizeAlbumName(album string) string {
 	replacer := strings.NewReplacer(
@@ -941,247 +594,33 @@ func albumArtistFromAlbumTitle(album string) string {
 	return orchestraCandidateFromText(album)
 }
 
-func normalizeClassicalAlbumText(album string) string {
-	album = util.ToSimplifiedChinese(normalizeAlbumName(album))
-	album = strings.ReplaceAll(album, "鴅", "鸟")
-	album = strings.ReplaceAll(album, "𫛝", "鸟")
-	album = strings.ReplaceAll(album, "鱲", "鳟")
-	album = strings.ReplaceAll(album, "𫚭", "鳟")
-	return album
-}
 
-func looksLikeClassicalWork(s string) bool {
-	s = strings.ToLower(strings.TrimSpace(s))
-	for _, term := range []string{"协奏曲", "奏鸣曲", "交响曲", "五重奏", "四重奏", "三重奏", "concerto", "sonata", "symphony", "quintet", "quartet", "trio"} {
-		if strings.Contains(s, term) {
-			return true
-		}
-	}
-	return false
-}
 
-func parseClassicalAlbumMetadata(album string) classicalMetadata {
-	album = normalizeClassicalAlbumText(album)
-	var meta classicalMetadata
-	if matches := catalogPrefixPattern.FindStringSubmatch(album); len(matches) >= 2 && !isDiscDir(matches[1]) {
-		meta.Catalog = strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(matches[1]), "_", "-"))
-	}
-	if matches := quotedClassicalPattern.FindStringSubmatch(album); len(matches) >= 3 {
-		meta.Composer = strings.Trim(strings.TrimSpace(matches[1]), " -_.。")
-		meta.Work = strings.TrimSpace(matches[2])
-		if meta.Catalog != "" {
-			meta.Composer = strings.TrimSpace(catalogPrefixPattern.ReplaceAllString(meta.Composer, ""))
-		}
-	} else if matches := colonClassicalPattern.FindStringSubmatch(album); len(matches) >= 3 && (meta.Catalog != "" || looksLikeClassicalWork(matches[2])) {
-		meta.Composer = strings.Trim(strings.TrimSpace(matches[1]), " -_.。")
-		meta.Work = strings.TrimSpace(matches[2])
-		if meta.Catalog != "" {
-			meta.Composer = strings.TrimSpace(catalogPrefixPattern.ReplaceAllString(meta.Composer, ""))
-		}
-	} else if matches := hyphenClassicalPattern.FindStringSubmatch(album); len(matches) >= 3 {
-		meta.Composer = strings.Trim(strings.TrimSpace(matches[1]), " -_.。")
-		meta.Work = strings.TrimSpace(matches[2])
-		if idx := strings.Index(meta.Work, "-"); idx >= 0 {
-			if performer := strings.TrimSpace(meta.Work[idx+1:]); performer != "" {
-				meta.Performer = performer
-			}
-			meta.Work = strings.TrimSpace(meta.Work[:idx])
-		}
-		if meta.Catalog != "" {
-			meta.Composer = strings.TrimSpace(catalogPrefixPattern.ReplaceAllString(meta.Composer, ""))
-		}
-	}
-	meta.Composer = cleanClassicalNameNoise(meta.Composer)
-	meta.Work = cleanClassicalNameNoise(meta.Work)
-	if idx := strings.Index(meta.Work, "-"); idx > 0 && looksLikeClassicalWork(meta.Work[:idx]) {
-		if meta.Performer == "" {
-			meta.Performer = strings.TrimSpace(meta.Work[idx+1:])
-		}
-		meta.Work = strings.TrimSpace(meta.Work[:idx])
-	}
-	if strings.Contains(meta.Work, "鳟鱼") && strings.Contains(album, "钢琴五重奏") {
-		meta.Work = "鳟鱼钢琴五重奏"
-	}
-	if matches := conductorEnsemblePattern.FindStringSubmatch(album); len(matches) >= 3 {
-		meta.Conductor = strings.TrimSpace(matches[1])
-		meta.Ensemble = strings.TrimSpace(matches[2])
-		meta.Performer = strings.TrimSpace(meta.Conductor + "指挥" + meta.Ensemble)
-	}
-	if meta.Ensemble == "" {
-		if matches := chamberEnsemblePattern.FindStringSubmatch(album); len(matches) >= 2 {
-			meta.Ensemble = strings.TrimSpace(matches[1])
-		} else if candidate := orchestraCandidateFromText(album); candidate != "" {
-			meta.Ensemble = candidate
-		}
-	}
-	instrumentMatches := instrumentalistAfterPunctuationPat.FindAllStringSubmatch(album, -1)
-	if len(instrumentMatches) == 0 {
-		instrumentMatches = instrumentalistPattern.FindAllStringSubmatch(album, -1)
-	}
-	for _, matches := range instrumentMatches {
-		if len(matches) < 3 {
-			continue
-		}
-		performer := cleanClassicalNameNoise(matches[1])
-		if performer != "" && performer != meta.Composer && !strings.Contains(performer, meta.Work) {
-			if meta.Performer == "" || strings.Contains(meta.Performer, "指挥") {
-				meta.Performer = performer
-			}
-			meta.Instrument = strings.TrimSpace(matches[2])
-		}
-	}
-	return meta
-}
 
-func (m classicalMetadata) IsClassical() bool {
-	return m.Catalog != "" || m.Composer != "" || m.Work != "" || m.Conductor != "" || m.Ensemble != "" || m.Instrument != ""
-}
 
-func (m classicalMetadata) OrchestraName() string {
-	if m.CanonicalOrchestra != "" {
-		return m.CanonicalOrchestra
-	}
-	if m.Ensemble != "" {
-		return m.Ensemble
-	}
-	if m.Performer != "" {
-		return orchestraCandidateFromText(m.Performer)
-	}
-	return ""
-}
 
-func (m classicalMetadata) AlbumName(fallback string) string {
-	base := ""
-	if m.Composer != "" && m.Work != "" {
-		base = m.Composer + ": " + m.Work
-	} else if m.Work != "" {
-		base = m.Work
-	} else {
-		base = fallback
-	}
-	if disambiguator := m.AlbumDisambiguator(); disambiguator != "" && !strings.Contains(base, disambiguator) {
-		base = strings.TrimSpace(base + " - " + disambiguator)
-	}
-	return normalizeAlbumName(base)
-}
 
-func (m classicalMetadata) AlbumDisambiguator() string {
-	var parts []string
-	add := func(part string) {
-		part = strings.TrimSpace(part)
-		if part == "" || part == m.Composer || part == m.Work {
-			return
-		}
-		for _, existing := range parts {
-			if existing == part {
-				return
-			}
-		}
-		parts = append(parts, part)
-	}
-	if m.Performer != "" && !strings.Contains(m.Performer, "指挥") {
-		for _, part := range strings.FieldsFunc(m.Performer, func(r rune) bool { return r == ',' || r == '，' || r == '/' || r == '、' }) {
-			add(part)
-		}
-	}
-	if len(parts) > 0 {
-		add(m.Conductor)
-	}
-	if len(parts) == 0 && m.Ensemble != "" && m.Conductor == "" {
-		add(m.Ensemble)
-	}
-	if len(parts) == 0 {
-		return ""
-	}
-	return strings.Join(parts, ", ")
-}
 
-func (m classicalMetadata) PreferredArtist(fallback string) string {
-	if orchestra := m.OrchestraName(); orchestra != "" {
-		return orchestra
-	}
-	if m.Composer != "" {
-		return m.Composer
-	}
-	return fallback
-}
 
-func classicalAlias(value string) string {
-	value = normalizeAlbumName(value)
-	for key, alias := range classicalAliases {
-		if strings.Contains(value, normalizeAlbumName(key)) {
-			return alias
-		}
-	}
-	return ""
-}
 
-func (m classicalMetadata) SearchHints() []string {
-	var hints []string
-	add := func(parts ...string) {
-		var cleaned []string
-		for _, part := range parts {
-			part = strings.TrimSpace(part)
-			if part != "" {
-				cleaned = append(cleaned, part)
-			}
-		}
-		if len(cleaned) > 0 {
-			hints = append(hints, strings.Join(cleaned, " "))
-		}
-	}
-	composerAlias := classicalAlias(m.Composer)
-	workAlias := classicalAlias(m.Work)
-	conductorAlias := classicalAlias(m.Conductor)
-	ensembleAlias := classicalAlias(m.OrchestraName())
-	add(m.Catalog, composerAlias, workAlias, conductorAlias, ensembleAlias)
-	add(composerAlias, workAlias, conductorAlias)
-	add(workAlias, conductorAlias, ensembleAlias)
-	add(m.Catalog, m.Composer, m.Work, m.Performer, m.OrchestraName())
-	return hints
-}
 
-func classicalWorkFromDiscogsTitle(title string) string {
-	title = normalizeAlbumName(title)
-	title = strings.TrimSpace(regexp.MustCompile(`\s*\([^)]*\)\s*$`).ReplaceAllString(title, ""))
-	return title
-}
 
-func classicalComposerFromDiscogsArtists(artists []string) string {
-	for _, artist := range artists {
-		name := strings.TrimSpace(localizedArtistName(artist))
-		if name != "" {
-			return name
-		}
-	}
-	return ""
-}
 
-func localizedClassicalWorkName(work string) string {
-	work = normalizeAlbumName(work)
-	if work == "" || api.ContainsChinese(work) {
-		return work
-	}
-	lower := strings.ToLower(work)
-	if strings.Contains(lower, "sonata") && strings.Contains(lower, "violin") && strings.Contains(lower, "piano") {
-		return combinedLocalizedTitle("小提琴奏鸣曲全集", work)
-	}
-	return work
-}
 
-func chineseClassicalWorkPrefix(work string) string {
-	work = normalizeAlbumName(work)
-	if !api.ContainsChinese(work) {
-		return ""
-	}
-	if idx := strings.Index(work, "-"); idx > 0 {
-		prefix := strings.TrimSpace(work[:idx])
-		if api.ContainsChinese(prefix) {
-			return prefix
-		}
-	}
-	return work
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 func localizedArtistName(name string) string {
 	name = strings.TrimSpace(normalizeArtistName(name))
@@ -1205,166 +644,19 @@ func localizedArtistName(name string) string {
 	return name
 }
 
-func orchestraCandidateFromText(text string) string {
-	text = normalizeClassicalAlbumText(text)
-	if text == "" {
-		return ""
-	}
-	if matches := conductorEnsemblePattern.FindStringSubmatch(text); len(matches) >= 3 {
-		return strings.TrimSpace(matches[2])
-	}
-	lower := strings.ToLower(text)
-	if idx := strings.LastIndex(text, "指挥"); idx >= 0 {
-		right := strings.TrimSpace(text[idx+len("指挥"):])
-		rightLower := strings.ToLower(right)
-		if strings.Contains(rightLower, "orchestra") ||
-			strings.Contains(rightLower, "philharmonic") ||
-			strings.Contains(rightLower, "symphony") ||
-			strings.Contains(rightLower, "ensemble") {
-			return right
-		}
-	}
-	if strings.Contains(lower, "orchestra") ||
-		strings.Contains(lower, "philharmonic") ||
-		strings.Contains(lower, "symphony") ||
-		strings.Contains(lower, "ensemble") ||
-		strings.Contains(text, "管弦乐团") ||
-		strings.Contains(text, "管弦樂團") ||
-		strings.Contains(text, "交响乐团") ||
-		strings.Contains(text, "交響樂團") ||
-		strings.Contains(text, "乐团") ||
-		strings.Contains(text, "樂團") {
-		return strings.TrimSpace(text)
-	}
-	return ""
-}
 
-func canonicalOrchestraFromCandidates(candidates ...string) string {
-	best := ""
-	bestLen := -1
-	bestChinese := ""
-	bestChineseLen := -1
-	for _, candidate := range candidates {
-		candidate = orchestraCandidateFromText(candidate)
-		candidate = util.NormalizeChineseForCompare(candidate)
-		candidate = normalizeAlbumName(candidate)
-		if candidate == "" {
-			continue
-		}
-		length := len([]rune(candidate))
-		if api.ContainsChinese(candidate) && length >= bestChineseLen {
-			bestChinese = candidate
-			bestChineseLen = length
-		}
-		if length >= bestLen {
-			best = candidate
-			bestLen = length
-		}
-	}
-	if bestChinese != "" {
-		return bestChinese
-	}
-	return best
-}
 
-func resolveCanonicalClassicalMetadata(meta classicalMetadata, candidates ...string) classicalMetadata {
-	orchestra := canonicalOrchestraFromCandidates(append(candidates, meta.CanonicalOrchestra, meta.Ensemble, meta.Performer)...)
-	if orchestra == "" {
-		return meta
-	}
-	meta.CanonicalOrchestra = orchestra
-	meta.Ensemble = orchestra
-	if meta.Conductor != "" {
-		meta.Performer = strings.TrimSpace(meta.Conductor + "指挥" + orchestra)
-	}
-	return meta
-}
 
-func preferLocalClassicalText(local, external string) string {
-	local = strings.TrimSpace(local)
-	external = strings.TrimSpace(external)
-	if local == "" {
-		return external
-	}
-	if external == "" {
-		return local
-	}
-	if api.ContainsChinese(local) && (classicalAlias(local) != "" || !api.ContainsChinese(external)) {
-		return local
-	}
-	return external
-}
 
-func preferClassicalCreditName(local, external string) string {
-	local = strings.TrimSpace(local)
-	external = strings.TrimSpace(external)
-	if external == "" {
-		return local
-	}
-	localized := localizedArtistName(external)
-	if api.ContainsChinese(local) && !api.ContainsChinese(localized) {
-		return local
-	}
-	return localized
-}
 
-func hasChineseClassicalContext(meta classicalMetadata) bool {
-	return api.ContainsChinese(meta.Composer) || api.ContainsChinese(meta.Work) || api.ContainsChinese(meta.AlbumName(""))
-}
 
-func enrichClassicalMetadataFromDiscogs(meta classicalMetadata, release api.DiscogsReleaseMeta) classicalMetadata {
-	if release.ID <= 0 {
-		return meta
-	}
-	if work := classicalWorkFromDiscogsTitle(release.Title); work != "" {
-		meta.Work = preferLocalClassicalText(meta.Work, localizedClassicalWorkName(work))
-	}
-	if composer := classicalComposerFromDiscogsArtists(release.Artists); composer != "" {
-		meta.Composer = preferLocalClassicalText(meta.Composer, composer)
-	}
-	discogsConductor := ""
-	discogsEnsemble := ""
-	var discogsPerformers []string
-	for _, credit := range release.Credits {
-		role := strings.ToLower(credit.Role)
-		if discogsConductor == "" && strings.Contains(role, "conduct") {
-			if name := strings.TrimSpace(normalizeArtistName(credit.Name)); name != "" {
-				discogsConductor = name
-			}
-		}
-		if discogsEnsemble == "" && (strings.Contains(role, "orchestra") || strings.Contains(role, "quartet") || strings.Contains(role, "trio") || strings.Contains(role, "quintet") || strings.Contains(role, "ensemble")) {
-			if name := strings.TrimSpace(normalizeArtistName(credit.Name)); name != "" {
-				discogsEnsemble = name
-			}
-		}
-		if strings.Contains(role, "piano") || strings.Contains(role, "violin") || strings.Contains(role, "cello") || strings.Contains(role, "flute") || strings.Contains(role, "clarinet") {
-			if name := strings.TrimSpace(normalizeArtistName(credit.Name)); name != "" {
-				discogsPerformers = append(discogsPerformers, name)
-			}
-		}
-	}
-	for _, artist := range release.Artists {
-		if discogsEnsemble == "" {
-			lowerArtist := strings.ToLower(artist)
-			if name := strings.TrimSpace(normalizeArtistName(artist)); name != "" && (strings.Contains(lowerArtist, "orchestra") || strings.Contains(lowerArtist, "quartet") || strings.Contains(lowerArtist, "trio") || strings.Contains(lowerArtist, "quintet")) {
-				discogsEnsemble = name
-			}
-		}
-	}
-	if discogsConductor != "" {
-		meta.Conductor = preferClassicalCreditName(meta.Conductor, discogsConductor)
-	}
-	if discogsEnsemble != "" {
-		meta.Ensemble = preferClassicalCreditName(meta.Ensemble, discogsEnsemble)
-	}
-	if meta.Performer == "" && len(discogsPerformers) > 0 {
-		meta.Performer = strings.Join(discogsPerformers, ", ")
-	}
-	if meta.Conductor != "" && meta.Ensemble != "" {
-		meta.Performer = meta.Conductor + "指挥" + meta.Ensemble
-	}
-	return meta
-}
+
+
+
+
+
+
+
 
 func preferAlbumTitleArtist(finalMainArtist, officialArtist, officialAlbum string) (string, string) {
 	albumArtist := albumArtistFromAlbumTitle(officialAlbum)
@@ -1380,48 +672,9 @@ func preferAlbumTitleArtist(finalMainArtist, officialArtist, officialAlbum strin
 	return finalMainArtist, officialArtist
 }
 
-func applyClassicalMetadataTags(tags map[string]string, meta classicalMetadata) {
-	if !meta.IsClassical() {
-		return
-	}
-	if meta.Catalog != "" {
-		tags["CATALOGNUMBER"] = meta.Catalog
-	}
-	if meta.Composer != "" {
-		tags["COMPOSER"] = meta.Composer
-	}
-	if meta.Conductor != "" {
-		tags["CONDUCTOR"] = meta.Conductor
-	}
-	if orchestra := meta.OrchestraName(); orchestra != "" {
-		tags["ORCHESTRA"] = orchestra
-		tags["ENSEMBLE"] = orchestra
-	}
-	if meta.Performer != "" {
-		tags["PERFORMER"] = meta.Performer
-	}
-	if meta.Instrument != "" {
-		tags["GROUPING"] = meta.Instrument
-	}
-	if tags["GENRE"] == "" {
-		tags["GENRE"] = "Classical"
-	}
-}
 
-func combinedLocalizedTitle(chinese, original string) string {
-	chinese = normalizeAlbumName(chinese)
-	original = normalizeAlbumName(original)
-	if original == "" {
-		return chinese
-	}
-	if chinese == "" || strings.EqualFold(chinese, original) {
-		return original
-	}
-	if strings.Contains(original, chinese) || strings.Contains(chinese, original) {
-		return original
-	}
-	return chinese + "-" + original
-}
+
+
 
 func containsKana(s string) bool {
 	for _, r := range s {
@@ -1432,15 +685,7 @@ func containsKana(s string) bool {
 	return false
 }
 
-func shouldPrefixChineseWork(classicalMeta classicalMetadata, title string) bool {
-	if chineseClassicalWorkPrefix(classicalMeta.Work) == "" {
-		return false
-	}
-	if !api.ContainsChinese(title) || containsKana(title) {
-		return true
-	}
-	return false
-}
+
 
 func isLikelyPinyinTitle(title string) bool {
 	title = strings.ToLower(normalizeAlbumName(title))
@@ -1553,37 +798,9 @@ func relatedMetadataCatalogs(catalog string) []string {
 	return catalogs
 }
 
-func fetchDiscogsMetaForClassical(classicalMeta classicalMetadata) (api.DiscogsReleaseMeta, string) {
-	if !classicalMeta.IsClassical() {
-		return api.DiscogsReleaseMeta{}, ""
-	}
-	primary := ""
-	if catalogs := relatedCatalogs(classicalMeta.Catalog); len(catalogs) > 0 {
-		primary = catalogs[0]
-	}
-	for _, catalog := range relatedMetadataCatalogs(classicalMeta.Catalog) {
-		meta, source := api.FetchDiscogsReleaseMeta(catalog, classicalMeta.SearchHints())
-		if meta.ID > 0 {
-			if primary != "" && catalog != primary {
-				meta.Tracks = nil
-				source += ":metadata"
-			}
-			return meta, source
-		}
-	}
-	return api.DiscogsReleaseMeta{}, ""
-}
 
-func localizedClassicalTrackTitles(classicalMeta classicalMetadata) (map[int]string, string) {
-	if !classicalMeta.IsClassical() || !hasChineseClassicalContext(classicalMeta) {
-		return nil, ""
-	}
-	tracks, source := api.FetchWikipediaClassicalTrackTitles(classicalMeta.Work, classicalMeta.Composer)
-	for track, title := range tracks {
-		tracks[track] = simplifyMetadataText(title)
-	}
-	return tracks, source
-}
+
+
 
 func albumTrackTitlesForConversion(filePath, artist, album string, classicalMeta classicalMetadata) (map[int]string, string) {
 	if !classicalMeta.IsClassical() {
