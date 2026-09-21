@@ -837,40 +837,98 @@ func buildMetadataArgs(ffmpegArgs []string, tags map[string]string) []string {
 	return ffmpegArgs
 }
 
-func ToFLAC(ctx context.Context, outRoot string, ch chan model.MusicFileInfo, delCh chan string) {
+func ToFLAC(ctx context.Context, outRoot string, ch chan model.ReleaseBatch, delCh chan string) {
 	for {
-		info := <-ch
-		if info.FilePath == "" {
+		batch := <-ch
+
+		// Filter out already processed files
+		var pendingFiles []model.MusicFileInfo
+		for _, info := range batch.Files {
+			p := info.FilePath
+			if p == "" {
+				p = info.CuePath
+			}
+			if p == "" {
+				continue
+			}
+			l, _ := db.Query(p)
+			if len(l) == 0 {
+				pendingFiles = append(pendingFiles, info)
+			}
+		}
+
+		if len(pendingFiles) == 0 {
 			continue
 		}
-		l, _ := db.Query(info.FilePath)
-		if len(l) > 0 {
-			continue
+
+		// Decide Batch Identity (Album/Artist) based on the first track
+		var batchArtist, batchAlbum string
+		if len(pendingFiles) > 0 {
+			first := pendingFiles[0]
+			batchArtist, batchAlbum = resolveBatchIdentity(ctx, first)
+			if batchArtist != "" {
+				log.Printf("[Batch Identity] Enforcing batch identity for %d files in %s: %s / %s", len(pendingFiles), batch.ReleaseContext, batchArtist, batchAlbum)
+			}
 		}
 
-		taskCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+		for _, info := range pendingFiles {
+			taskCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 
-		var err error
-		if info.CuePath == "" {
-			err = singleConvert(taskCtx, info, outRoot)
-		} else {
-			err = cueConvert(taskCtx, info, outRoot)
-		}
+			var err error
+			if info.CuePath == "" {
+				err = singleConvert(taskCtx, info, outRoot, batchArtist, batchAlbum)
+			} else {
+				err = cueConvert(taskCtx, info, outRoot, batchArtist, batchAlbum)
+			}
 
-		if err == nil {
-			db.Insert(&db.MusicInfo{Music: info.FilePath, State: 1})
-			delCh <- info.FilePath
-		} else if errors.Is(err, errSkipNoTrackMetadata) {
-			log.Printf("Skipped %s: no usable track metadata found", info.FilePath)
-			db.Insert(&db.MusicInfo{Music: info.FilePath, State: 1})
-		} else {
-			log.Printf("Failed to process %s: %v", info.FilePath, err)
+			p := info.FilePath
+			if p == "" {
+				p = info.CuePath
+			}
+			if err == nil {
+				db.Insert(&db.MusicInfo{Music: p, State: 1})
+				delCh <- p
+			} else if errors.Is(err, errSkipNoTrackMetadata) {
+				log.Printf("Skipped %s: no usable track metadata found", p)
+				db.Insert(&db.MusicInfo{Music: p, State: 1})
+			} else {
+				log.Printf("Failed to process %s: %v", p, err)
+			}
+			cancel()
 		}
-		cancel()
 	}
 }
 
-func singleConvert(ctx context.Context, st model.MusicFileInfo, outRoot string) error {
+func resolveBatchIdentity(ctx context.Context, info model.MusicFileInfo) (string, string) {
+	// A fast heuristic to get the album identity from the first file.
+	p := info.FilePath
+	if p == "" {
+		p = info.CuePath
+	}
+	if p == "" {
+		return "", ""
+	}
+
+	meta, err := GetFormat(ctx, p)
+	if err != nil {
+		return "", ""
+	}
+	origArtist := meta.GetTag("ARTIST")
+	origAlbum := meta.GetTag("ALBUM")
+	origTitle := meta.GetTag("TITLE")
+	albumHint := api.CleanHint(origAlbum)
+	if albumHint == "" || albumHint == "Unknown Album" {
+		albumHint = api.CleanHint(sourceAlbumDirName(p))
+	}
+
+	chain := NewProviderChain()
+	if result, ok := chain.Fetch(origTitle, origArtist, albumHint); ok {
+		return result.Artist, result.Album
+	}
+	return "", ""
+}
+
+func singleConvert(ctx context.Context, st model.MusicFileInfo, outRoot string, batchArtist, batchAlbum string) error {
 	var chain *ProviderChain
 	meta, err := GetFormat(ctx, st.FilePath)
 	if err != nil {
@@ -956,6 +1014,12 @@ func singleConvert(ctx context.Context, st model.MusicFileInfo, outRoot string) 
 	if shouldTrustLocalMetadata(origTitle, origArtist, albumHint) {
 		log.Printf("[Metadata Winner] Source: Local. Data: %s - %s / %s", origArtist, origTitle, albumHint)
 		officialArtist, officialAlbum, officialTitle = origArtist, albumHint, origTitle
+		if batchArtist != "" {
+			officialArtist = batchArtist
+		}
+		if batchAlbum != "" {
+			officialAlbum = batchAlbum
+		}
 		if sourceTracks := sourceDiscTrackCount(st.FilePath); sourceTracks > 0 {
 			trackCount = sourceTracks
 		}
@@ -965,6 +1029,12 @@ func singleConvert(ctx context.Context, st model.MusicFileInfo, outRoot string) 
 	chain = NewProviderChain()
 	if meta, ok := chain.Fetch(origTitle, origArtist, albumHint); ok {
 		officialArtist, officialAlbum, officialTitle = meta.Artist, meta.Album, meta.Title
+		if batchArtist != "" {
+			officialArtist = batchArtist
+		}
+		if batchAlbum != "" {
+			officialAlbum = batchAlbum
+		}
 		coverUrl, neteaseYear = meta.CoverURL, meta.Year
 		if meta.TrackTotal > 0 {
 			trackCount = meta.TrackTotal
@@ -1146,7 +1216,7 @@ PROCESS_PATH:
 	return nil
 }
 
-func cueConvert(ctx context.Context, st model.MusicFileInfo, outRoot string) error {
+func cueConvert(ctx context.Context, st model.MusicFileInfo, outRoot string, batchArtist, batchAlbum string) error {
 	var chain *ProviderChain
 	meta, err := GetFormat(ctx, st.FilePath)
 	if err != nil {
@@ -1189,6 +1259,12 @@ func cueConvert(ctx context.Context, st model.MusicFileInfo, outRoot string) err
 		chain = NewProviderChain()
 		if meta, ok := chain.Fetch(firstTrack, origArtist, albumHint); ok {
 			officialArtist, officialAlbum = meta.Artist, meta.Album
+			if batchArtist != "" {
+				officialArtist = batchArtist
+			}
+			if batchAlbum != "" {
+				officialAlbum = batchAlbum
+			}
 			coverUrl, neteaseYear = meta.CoverURL, meta.Year
 		}
 	}

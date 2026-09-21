@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"MusicConvert/api"
 	"MusicConvert/audio"
 	"MusicConvert/config"
@@ -21,7 +22,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-var convertChan = make(chan model.MusicFileInfo, 1000)
+var convertChan = make(chan model.ReleaseBatch, 1000)
 var delChan = make(chan string, 1000)
 
 const buildVersion = "metadata-fix-v4-smb-safe-paths"
@@ -227,7 +228,7 @@ func main() {
 						}
 						// Only send to channel if it's a valid music or cue file and has a FilePath
 						if musicFileInfo.FilePath != "" {
-							convertChan <- musicFileInfo
+							convertChan <- model.ReleaseBatch{ReleaseContext: filepath.Dir(musicFileInfo.FilePath), Files: []model.MusicFileInfo{musicFileInfo}}
 						}
 					}
 				}
