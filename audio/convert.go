@@ -2,7 +2,6 @@ package audio
 
 import (
 	"MusicConvert/api"
-	"MusicConvert/config"
 	"MusicConvert/db"
 	"MusicConvert/model"
 	"MusicConvert/util"
@@ -36,10 +35,6 @@ var (
 	instrumentalistPattern             = regexp.MustCompile(`(?:^|[。；;，,])([^。；;，,「」]+?)(钢琴|小提琴|大提琴|吉他|古筝|琵琶|长笛|单簧管|双簧管|萨克斯|竖琴|风琴|管风琴)`)
 	instrumentalistAfterPunctuationPat = regexp.MustCompile(`[。；;，,]([^。；;，,「」]+?)(钢琴|小提琴|大提琴|吉他|古筝|琵琶|长笛|单簧管|双簧管|萨克斯|竖琴|风琴|管风琴)`)
 )
-
-
-
-
 
 // collectAllTags merges tags from ffprobe, CUE sheet, and Netease API
 func collectAllTags(meta *AutoMetadata, cueSheet *CueSheet, cueTrack *Track, neteaseYear string) map[string]string {
@@ -120,50 +115,12 @@ func enrichWithItunesAndStandardize(tags map[string]string, itunesMeta api.Itune
 	log.Printf("[Metadata Scraping] 最终注入标签(Disc %d/%d Track %d/%d): %#v", discNum, discCount, trackNum, totalTracks, tags)
 }
 
-
-
-
-
-
-
 func outputExtFor(inputExt string) string {
 	if strings.EqualFold(inputExt, ".mp3") {
 		return ".mp3"
 	}
 	return ".flac"
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 func cueAlbumTitleAndDisc(title string) (string, int) {
 	title = strings.TrimSpace(title)
@@ -207,10 +164,6 @@ func appendCodecArgs(args []string, outputExt string, hasCover bool) []string {
 		args = append(args, "-c:v", "copy", "-disposition:v", "attached_pic")
 	}
 	return args
-}
-
-func shouldUseMusicBrainz(title, artist, album string) bool {
-	return !api.ContainsChinese(title) && !api.ContainsChinese(artist) && !api.ContainsChinese(album)
 }
 
 func looksLikeUnknownArtist(artist string) bool {
@@ -303,8 +256,6 @@ func selectAlbumArtist(meta *AutoMetadata, filePath, origArtist, officialArtist 
 	}
 	return "Unknown Artist"
 }
-
-
 
 func firstYear(values ...string) string {
 	for _, value := range values {
@@ -433,10 +384,6 @@ func preferItunesAlbumArtist(currentArtist, itunesArtist string) string {
 	return simplifyMetadataText(primaryAlbumArtist(itunesArtist))
 }
 
-
-
-
-
 func constrainCueAlbumToContext(officialAlbum, contextAlbum string) string {
 	if contextAlbum == "" || officialAlbum == "" || officialAlbum == "Unknown Album" {
 		return officialAlbum
@@ -482,10 +429,6 @@ func validateOutputIdentity(artist, album string) error {
 	}
 	return nil
 }
-
-
-
-
 
 func normalizeAlbumName(album string) string {
 	replacer := strings.NewReplacer(
@@ -594,34 +537,6 @@ func albumArtistFromAlbumTitle(album string) string {
 	return orchestraCandidateFromText(album)
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 func localizedArtistName(name string) string {
 	name = strings.TrimSpace(normalizeArtistName(name))
 	if name == "" {
@@ -644,20 +559,6 @@ func localizedArtistName(name string) string {
 	return name
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 func preferAlbumTitleArtist(finalMainArtist, officialArtist, officialAlbum string) (string, string) {
 	albumArtist := albumArtistFromAlbumTitle(officialAlbum)
 	if albumArtist == "" {
@@ -672,10 +573,6 @@ func preferAlbumTitleArtist(finalMainArtist, officialArtist, officialAlbum strin
 	return finalMainArtist, officialArtist
 }
 
-
-
-
-
 func containsKana(s string) bool {
 	for _, r := range s {
 		if (r >= 0x3040 && r <= 0x30ff) || (r >= 0x31f0 && r <= 0x31ff) {
@@ -684,8 +581,6 @@ func containsKana(s string) bool {
 	}
 	return false
 }
-
-
 
 func isLikelyPinyinTitle(title string) bool {
 	title = strings.ToLower(normalizeAlbumName(title))
@@ -797,10 +692,6 @@ func relatedMetadataCatalogs(catalog string) []string {
 	}
 	return catalogs
 }
-
-
-
-
 
 func albumTrackTitlesForConversion(filePath, artist, album string, classicalMeta classicalMetadata) (map[int]string, string) {
 	if !classicalMeta.IsClassical() {
@@ -980,6 +871,7 @@ func ToFLAC(ctx context.Context, outRoot string, ch chan model.MusicFileInfo, de
 }
 
 func singleConvert(ctx context.Context, st model.MusicFileInfo, outRoot string) error {
+	var chain *ProviderChain
 	meta, err := GetFormat(ctx, st.FilePath)
 	if err != nil {
 		return err
@@ -1059,8 +951,6 @@ func singleConvert(ctx context.Context, st model.MusicFileInfo, outRoot string) 
 	}
 
 	officialArtist, officialAlbum, officialTitle, trackNum, trackCount := origArtist, "Unknown Album", origTitle, originalTrackNum, 0
-	var nArtist, nAlbum, nTitle string
-	var nTrackNum, nTrackCount int
 	coverUrl, neteaseYear := "", ""
 
 	if shouldTrustLocalMetadata(origTitle, origArtist, albumHint) {
@@ -1072,45 +962,15 @@ func singleConvert(ctx context.Context, st model.MusicFileInfo, outRoot string) 
 		goto PROCESS_PATH
 	}
 
-	// 1. Spotify
-	if config.IsSpotifyEnabled() {
-		sArtist, sAlbum, sTitle, sCover, sYear, sTrackNum := api.FetchSpotifyMeta(origTitle, origArtist, albumHint)
-		if sArtist != "" {
-			log.Printf("[Metadata Winner] Source: Spotify. Data: %s - %s / %s", sArtist, sTitle, sAlbum)
-			officialArtist, officialAlbum, officialTitle, coverUrl, neteaseYear = sArtist, sAlbum, sTitle, sCover, sYear
-			trackNum = normalizeTrackNumber(sTrackNum, originalTrackNum)
-			goto PROCESS_PATH
+	chain = NewProviderChain()
+	if meta, ok := chain.Fetch(origTitle, origArtist, albumHint); ok {
+		officialArtist, officialAlbum, officialTitle = meta.Artist, meta.Album, meta.Title
+		coverUrl, neteaseYear = meta.CoverURL, meta.Year
+		if meta.TrackTotal > 0 {
+			trackCount = meta.TrackTotal
 		}
+		trackNum = normalizeTrackNumber(meta.TrackNum, originalTrackNum)
 	}
-
-	// 2. MusicBrainz
-	if shouldUseMusicBrainz(origTitle, origArtist, albumHint) {
-		mArtist, mAlbum, mTitle, mYear, mTrackNum, mTrackTotal := api.FetchMBMetadata(origTitle, origArtist, albumHint)
-		if mArtist != "" {
-			log.Printf("[Metadata Winner] Source: MusicBrainz. Data: %s - %s / %s", mArtist, mTitle, mAlbum)
-			officialArtist, officialAlbum, officialTitle, neteaseYear = mArtist, mAlbum, mTitle, mYear
-			if mTrackTotal > 0 {
-				trackCount = mTrackTotal
-			}
-			if n, err := strconv.Atoi(mTrackNum); err == nil {
-				trackNum = normalizeTrackNumber(n, originalTrackNum)
-			} else {
-				trackNum = normalizeTrackNumber(0, originalTrackNum)
-			}
-			_, _, _, coverUrl, _ = api.GetTranslatedArtistAlbum(officialArtist, officialAlbum)
-			goto PROCESS_PATH
-		}
-	} else {
-		log.Printf("[MusicBrainz Skip] Chinese metadata detected; using Netease first.")
-	}
-
-	// 3. Netease
-	nArtist, nAlbum, nTitle, nTrackNum, nTrackCount = api.IdentifyFullContext(origTitle, origArtist, albumHint)
-	officialArtist, officialAlbum, officialTitle = nArtist, nAlbum, nTitle
-	trackNum = normalizeTrackNumber(nTrackNum, originalTrackNum)
-	trackCount = nTrackCount
-	_, _, _, coverUrl, neteaseYear = api.GetTranslatedArtistAlbum(officialArtist, officialAlbum)
-	log.Printf("[Metadata Winner] Source: Netease. Data: %s - %s / %s", officialArtist, officialTitle, officialAlbum)
 
 PROCESS_PATH:
 	officialAlbum = api.PreferDetailedAlbumName(officialAlbum, albumHint)
@@ -1287,6 +1147,7 @@ PROCESS_PATH:
 }
 
 func cueConvert(ctx context.Context, st model.MusicFileInfo, outRoot string) error {
+	var chain *ProviderChain
 	meta, err := GetFormat(ctx, st.FilePath)
 	if err != nil {
 		return err
@@ -1324,31 +1185,14 @@ func cueConvert(ctx context.Context, st model.MusicFileInfo, outRoot string) err
 
 	if len(cueSheet.Tracks) > 0 {
 		firstTrack := cueSheet.Tracks[0].Title
-		if config.IsSpotifyEnabled() {
-			sArtist, sAlbum, _, sCover, sYear, _ := api.FetchSpotifyMeta(firstTrack, origArtist, albumHint)
-			if sArtist != "" {
-				officialArtist, officialAlbum, coverUrl, neteaseYear = sArtist, sAlbum, sCover, sYear
-				log.Printf("[CUE Metadata] Source: Spotify - %s / %s", sArtist, sAlbum)
-				goto PROCESS_CUE
-			}
+
+		chain = NewProviderChain()
+		if meta, ok := chain.Fetch(firstTrack, origArtist, albumHint); ok {
+			officialArtist, officialAlbum = meta.Artist, meta.Album
+			coverUrl, neteaseYear = meta.CoverURL, meta.Year
 		}
-		if shouldUseMusicBrainz(firstTrack, origArtist, albumHint) {
-			mArtist, mAlbum, _, mYear, _, _ := api.FetchMBMetadata(firstTrack, origArtist, albumHint)
-			if mArtist != "" {
-				officialArtist, officialAlbum, neteaseYear = mArtist, mAlbum, mYear
-				_, _, _, coverUrl, _ = api.GetTranslatedArtistAlbum(officialArtist, officialAlbum)
-				log.Printf("[CUE Metadata] Source: MusicBrainz - %s / %s", mArtist, mAlbum)
-				goto PROCESS_CUE
-			}
-		} else {
-			log.Printf("[MusicBrainz Skip] Chinese CUE metadata detected; using Netease first.")
-		}
-		officialArtist, officialAlbum, _, _, _ = api.IdentifyFullContext(firstTrack, origArtist, albumHint)
-		_, _, _, coverUrl, neteaseYear = api.GetTranslatedArtistAlbum(officialArtist, officialAlbum)
-		log.Printf("[CUE Metadata] Source: Netease - %s / %s", officialArtist, officialAlbum)
 	}
 
-PROCESS_CUE:
 	contextAlbum := cueAlbumContext(albumHint, sourceAlbumDir, cueAlbumTitle)
 	officialAlbum = constrainCueAlbumToContext(officialAlbum, contextAlbum)
 	officialAlbum = api.PreferDetailedAlbumName(officialAlbum, albumHint)
