@@ -45,6 +45,22 @@ func (c *ProviderChain) Fetch(title, artist, albumHint string) (OnlineMetadata, 
 	for _, p := range c.providers {
 		meta, ok := p.Fetch(title, artist, albumHint)
 		if ok {
+			// --- Localization & Cover Fetching Layer ---
+			if p.Name() == "Spotify" || p.Name() == "MusicBrainz" {
+				localizedArtist, _, localizedAlbum, coverUrl, year := api.GetTranslatedArtistAlbum(meta.Artist, meta.Album)
+				if localizedArtist != "" && localizedArtist != "Unknown Artist" {
+					meta.Artist = localizedArtist
+				}
+				if localizedAlbum != "" {
+					meta.Album = localizedAlbum
+				}
+				if coverUrl != "" {
+					meta.CoverURL = coverUrl
+				}
+				if year != "" && meta.Year == "" {
+					meta.Year = year
+				}
+			}
 			log.Printf("[Metadata Winner] Source: %s. Data: %s - %s / %s", p.Name(), meta.Artist, meta.Title, meta.Album)
 			return meta, true
 		}
@@ -91,9 +107,6 @@ func (p *MusicBrainzProvider) Fetch(title, artist, albumHint string) (OnlineMeta
 
 	mArtist, mAlbum, mTitle, mYear, mTrackNumStr, mTrackTotal := api.FetchMBMetadata(title, artist, albumHint)
 	if mArtist != "" {
-		// Like before, MB needs Netease to translate/fetch cover
-		_, _, _, coverUrl, _ := api.GetTranslatedArtistAlbum(mArtist, mAlbum)
-
 		trackNum, _ := strconv.Atoi(mTrackNumStr)
 		return OnlineMetadata{
 			Artist:     mArtist,
@@ -102,7 +115,6 @@ func (p *MusicBrainzProvider) Fetch(title, artist, albumHint string) (OnlineMeta
 			Year:       mYear,
 			TrackNum:   trackNum,
 			TrackTotal: mTrackTotal,
-			CoverURL:   coverUrl,
 			Source:     p.Name(),
 		}, true
 	}

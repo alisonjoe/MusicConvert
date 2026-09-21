@@ -162,7 +162,7 @@ func DelSrc(isDel model.SwitchState, ch chan string) {
 	}
 }
 
-func GetAllMusic(path string, ch chan model.MusicFileInfo) {
+func GetAllMusic(path string, ch chan model.ReleaseBatch) {
 	var files []string
 	path = ResolveExistingPath(path)
 	err := filepath.Walk(path, visit(&files))
@@ -170,8 +170,33 @@ func GetAllMusic(path string, ch chan model.MusicFileInfo) {
 		log.Printf("GetAllMusic walk error: %v", err)
 	}
 	list := splitFiles(files)
-	for _, v := range list {
-		ch <- v
+	
+	batches := make(map[string][]model.MusicFileInfo)
+	for _, info := range list {
+		p := info.FilePath
+		if p == "" {
+			p = info.CuePath
+		}
+		if p == "" {
+			continue
+		}
+		
+		dir := filepath.Dir(p)
+		dirName := strings.ToUpper(filepath.Base(dir))
+		isDiscDir := strings.HasPrefix(dirName, "CD") || strings.HasPrefix(dirName, "DISC") || dirName == "TRACKS" || strings.HasPrefix(dirName, "VOL")
+		
+		releaseContext := dir
+		if isDiscDir {
+			releaseContext = filepath.Dir(dir)
+		}
+		batches[releaseContext] = append(batches[releaseContext], info)
+	}
+
+	for ctxPath, batchFiles := range batches {
+		ch <- model.ReleaseBatch{
+			ReleaseContext: ctxPath,
+			Files:          batchFiles,
+		}
 	}
 }
 
