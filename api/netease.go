@@ -363,9 +363,14 @@ func GetAlbumTrackCount(albumID int) int {
 }
 
 func FindAlbumID(artist, album string) int {
+	id, _, _, _ := FindAlbumMeta(artist, album)
+	return id
+}
+
+func FindAlbumMeta(artist, album string) (int, string, string, string) {
 	album = CleanHint(album)
 	if album == "" || album == "Unknown Album" {
-		return 0
+		return 0, "", "", ""
 	}
 	query := album
 	if artist != "" && artist != "Unknown Artist" {
@@ -374,11 +379,11 @@ func FindAlbumID(artist, album string) int {
 	apiURL := fmt.Sprintf("http://music.163.com/api/search/get/web?s=%s&type=10&offset=0&limit=10", url.QueryEscape(query))
 	body, err := doRequestWithRetry(apiURL)
 	if err != nil {
-		return 0
+		return 0, "", "", ""
 	}
 	var res NeteaseAlbumSearchResp
 	if err := json.Unmarshal(body, &res); err != nil {
-		return 0
+		return 0, "", "", ""
 	}
 	targetAlbum := normalizeSongName(album)
 	targetArtist := normalizeSongName(artist)
@@ -389,10 +394,14 @@ func FindAlbumID(artist, album string) int {
 			continue
 		}
 		if targetArtist == "" || artistName == "" || artistName == targetArtist || strings.Contains(artistName, targetArtist) || strings.Contains(targetArtist, artistName) {
-			return a.Id
+			yearStr := ""
+			if a.PublishTime > 0 {
+				yearStr = fmt.Sprintf("%d", time.Unix(a.PublishTime/1000, 0).Year())
+			}
+			return a.Id, a.Name, a.PicUrl, yearStr
 		}
 	}
-	return 0
+	return 0, "", "", ""
 }
 
 func FilterJunkTags(val string) string {
@@ -866,41 +875,19 @@ func searchSongAndMatch(query, targetTitle, targetArtist, albumHint string, pref
 
 func GetTranslatedArtistAlbum(artist, album string) (string, string, string, string, string) {
 	canonical := GetArtistCanonicalName(artist)
-	albumName := album
-	coverUrl := ""
-	yearStr := ""
 
-	albumID := FindAlbumID(artist, album)
-	if albumID <= 0 && canonical != artist {
-		albumID = FindAlbumID(canonical, album)
+	id, name, picUrl, year := FindAlbumMeta(artist, album)
+	if id <= 0 && canonical != artist {
+		id, name, picUrl, year = FindAlbumMeta(canonical, album)
 	}
-	if albumID <= 0 {
+
+	if id <= 0 {
 		log.Printf("[Album Cover] No validated album match for %s / %s; skip cover fallback", artist, album)
-		return canonical, canonical, albumName, coverUrl, yearStr
+		return canonical, canonical, album, "", ""
 	}
 
-	detail, err := GetAlbumDetail(albumID)
-	if err != nil {
-		log.Printf("[Album Cover] Failed to fetch validated album detail for %s / %s (albumID=%d): %v", artist, album, albumID, err)
-		return canonical, canonical, albumName, coverUrl, yearStr
-	}
-	albumName = PreferDetailedAlbumName(detail.Album.Name, album)
-	coverUrl = detail.Album.PicUrl
-
-	apiURL := fmt.Sprintf("http://music.163.com/api/search/get/web?s=%s&type=10&offset=0&limit=10", url.QueryEscape(strings.TrimSpace(artist+" "+album)))
-	body, err := doRequestWithRetry(apiURL)
-	if err == nil {
-		var res NeteaseAlbumSearchResp
-		if err := json.Unmarshal(body, &res); err == nil {
-			for _, a := range res.Result.Albums {
-				if a.Id == albumID && a.PublishTime > 0 {
-					yearStr = fmt.Sprintf("%d", time.Unix(a.PublishTime/1000, 0).Year())
-					break
-				}
-			}
-		}
-	}
-	return canonical, canonical, albumName, coverUrl, yearStr
+	albumName := PreferDetailedAlbumName(name, album)
+	return canonical, canonical, albumName, picUrl, year
 }
 
 func GetSongLyrics(title, artist string) string {
