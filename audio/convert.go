@@ -863,11 +863,18 @@ func ToFLAC(ctx context.Context, outRoot string, ch chan model.ReleaseBatch, del
 
 		// Decide Batch Identity (Album/Artist) based on the first track
 		var batchArtist, batchAlbum string
+		var batchTrackTitles map[int]string
 		if len(pendingFiles) > 0 {
 			first := pendingFiles[0]
 			batchArtist, batchAlbum = resolveBatchIdentity(ctx, first)
 			if batchArtist != "" {
 				log.Printf("[Batch Identity] Enforcing batch identity for %d files in %s: %s / %s", len(pendingFiles), batch.ReleaseContext, batchArtist, batchAlbum)
+				if api.IsOpenAPIEnabled() {
+					batchTrackTitles, _, _ = api.GetOpenAPIAlbumTrackTitles(batchArtist, batchAlbum)
+					if len(batchTrackTitles) > 0 {
+						log.Printf("[Batch Tracklist] Fetched %d tracks via OpenAPI for batch", len(batchTrackTitles))
+					}
+				}
 			}
 		}
 
@@ -876,9 +883,9 @@ func ToFLAC(ctx context.Context, outRoot string, ch chan model.ReleaseBatch, del
 
 			var err error
 			if info.CuePath == "" {
-				err = singleConvert(taskCtx, info, outRoot, batchArtist, batchAlbum)
+				err = singleConvert(taskCtx, info, outRoot, batchArtist, batchAlbum, batchTrackTitles)
 			} else {
-				err = cueConvert(taskCtx, info, outRoot, batchArtist, batchAlbum)
+				err = cueConvert(taskCtx, info, outRoot, batchArtist, batchAlbum, batchTrackTitles)
 			}
 
 			p := info.FilePath
@@ -928,7 +935,7 @@ func resolveBatchIdentity(ctx context.Context, info model.MusicFileInfo) (string
 	return "", ""
 }
 
-func singleConvert(ctx context.Context, st model.MusicFileInfo, outRoot string, batchArtist, batchAlbum string) error {
+func singleConvert(ctx context.Context, st model.MusicFileInfo, outRoot string, batchArtist, batchAlbum string, batchTrackTitles map[int]string) error {
 	var chain *ProviderChain
 	meta, err := GetFormat(ctx, st.FilePath)
 	if err != nil {
@@ -1216,7 +1223,7 @@ PROCESS_PATH:
 	return nil
 }
 
-func cueConvert(ctx context.Context, st model.MusicFileInfo, outRoot string, batchArtist, batchAlbum string) error {
+func cueConvert(ctx context.Context, st model.MusicFileInfo, outRoot string, batchArtist, batchAlbum string, batchTrackTitles map[int]string) error {
 	var chain *ProviderChain
 	meta, err := GetFormat(ctx, st.FilePath)
 	if err != nil {
