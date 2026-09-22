@@ -71,7 +71,7 @@ type openAPITokenResp struct {
 	} `json:"data"`
 }
 
-func isOpenAPIEnabled() bool {
+func IsOpenAPIEnabled() bool {
 	if config.GetNeteaseAccessToken() != "" {
 		return true
 	}
@@ -142,7 +142,7 @@ func signOpenAPIParams(params map[string]string) (string, error) {
 }
 
 func openAPIRequest(path string, biz map[string]any, accessToken string) ([]byte, error) {
-	if !isOpenAPIEnabled() {
+	if !IsOpenAPIEnabled() {
 		return nil, fmt.Errorf("netease openapi disabled")
 	}
 	bizBytes, err := json.Marshal(biz)
@@ -323,4 +323,16 @@ func GetOpenAPIAlbumTrackTitles(artist, album string) (map[int]string, string, e
 
 func TestSearch(artist, album string) (string, string, string, error) {
     return searchOpenAPIAlbumID(artist, album)
+}
+
+func TestSongSearch(keyword string) ([]byte, error) {
+	token, err := getOpenAPIAccessToken()
+	if err != nil {
+		return nil, err
+	}
+	return openAPIRequest("/openapi/music/basic/search/song/get/v2", map[string]any{
+		"keyword": keyword,
+		"limit":   5,
+		"offset":  0,
+	}, token)
 }

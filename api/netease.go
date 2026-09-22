@@ -238,7 +238,7 @@ func GetAlbumTrackTitlesWithSource(artist, album string) (map[int]string, string
 		}
 		return tracks, "track_overrides"
 	}
-	if isOpenAPIEnabled() {
+	if IsOpenAPIEnabled() {
 		if openAPITracks, source, err := GetOpenAPIAlbumTrackTitles(artist, album); err == nil && len(openAPITracks) > 0 {
 			return openAPITracks, source
 		} else if err != nil {
