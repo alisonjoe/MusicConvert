@@ -57,6 +57,13 @@ func (c *ProviderChain) Fetch(title, artist, albumHint string) (OnlineMetadata, 
 				if coverUrl != "" {
 					meta.CoverURL = coverUrl
 				}
+				if meta.CoverURL == "" {
+					itunesMeta := api.FetchItunesMeta(meta.Artist, meta.Album)
+					if itunesMeta.CoverUrl != "" {
+						log.Printf("[Cover Fallback] Fetched high-res cover from iTunes for %s / %s", meta.Artist, meta.Album)
+						meta.CoverURL = itunesMeta.CoverUrl
+					}
+				}
 				if year != "" && meta.Year == "" {
 					meta.Year = year
 				}

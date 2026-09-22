@@ -21,6 +21,7 @@ type ItunesMeta struct {
 	Date           string
 	DiscTotal      int
 	CollectionID   int64
+	CoverUrl       string
 }
 
 type ItunesSearchResp struct {
@@ -31,6 +32,7 @@ type ItunesSearchResp struct {
 		ReleaseDate      string `json:"releaseDate"`
 		DiscCount        int    `json:"discCount"`
 		CollectionID     int64  `json:"collectionId"`
+		ArtworkUrl100    string `json:"artworkUrl100"`
 	} `json:"results"`
 }
 
@@ -158,6 +160,9 @@ func fetchItunesMetaForQuery(query, contextLabel string) ItunesMeta {
 		meta.CollectionName = r.CollectionName
 		meta.DiscTotal = r.DiscCount
 		meta.CollectionID = r.CollectionID
+		if r.ArtworkUrl100 != "" {
+			meta.CoverUrl = strings.Replace(r.ArtworkUrl100, "100x100bb", "1000x1000bb", 1)
+		}
 		if len(r.ReleaseDate) >= 4 {
 			meta.Date = r.ReleaseDate[:4] // 提取 YYYY
 		}
