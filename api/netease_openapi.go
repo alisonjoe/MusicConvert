@@ -38,6 +38,7 @@ type openAPIAlbum struct {
 	ID      string          `json:"id"`
 	Name    string          `json:"name"`
 	Artists []openAPIArtist `json:"artists"`
+	PicUrl  string          `json:"picUrl"`
 }
 
 type openAPIAlbumSearchResp struct {
@@ -52,6 +53,7 @@ type openAPISong struct {
 	ID      string          `json:"id"`
 	Name    string          `json:"name"`
 	Artists []openAPIArtist `json:"artists"`
+	PicUrl  string          `json:"picUrl"`
 	Album   openAPIAlbum    `json:"album"`
 }
 
@@ -219,10 +221,10 @@ func getOpenAPIAccessToken() (string, error) {
 	return openAPIToken, nil
 }
 
-func searchOpenAPIAlbumID(artist, album string) (string, string, error) {
+func searchOpenAPIAlbumID(artist, album string) (string, string, string, error) {
 	token, err := getOpenAPIAccessToken()
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	keyword := strings.TrimSpace(artist + " " + album)
 	log.Printf("[Netease OpenAPI] Searching album: %s", keyword)
@@ -232,14 +234,14 @@ func searchOpenAPIAlbumID(artist, album string) (string, string, error) {
 		"offset":  0,
 	}, token)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	var res openAPIAlbumSearchResp
 	if err := json.Unmarshal(body, &res); err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	if res.Code != 200 {
-		return "", "", fmt.Errorf("netease openapi album search failed: code=%d message=%s", res.Code, res.Message)
+		return "", "", "", fmt.Errorf("netease openapi album search failed: code=%d message=%s", res.Code, res.Message)
 	}
 	targetAlbum := normalizeSongName(album)
 	targetArtist := normalizeSongName(artist)
@@ -249,19 +251,19 @@ func searchOpenAPIAlbumID(artist, album string) (string, string, error) {
 			continue
 		}
 		if targetArtist == "" || len(record.Artists) == 0 {
-			return record.ID, record.Name, nil
+			return record.ID, record.Name, record.PicUrl, nil
 		}
 		for _, a := range record.Artists {
 			recordArtist := normalizeSongName(a.Name)
 			if recordArtist == targetArtist || strings.Contains(recordArtist, targetArtist) || strings.Contains(targetArtist, recordArtist) {
-				return record.ID, record.Name, nil
+				return record.ID, record.Name, record.PicUrl, nil
 			}
 		}
 	}
 	if len(res.Data.Records) > 0 {
-		return res.Data.Records[0].ID, res.Data.Records[0].Name, nil
+		return res.Data.Records[0].ID, res.Data.Records[0].Name, res.Data.Records[0].PicUrl, nil
 	}
-	return "", "", fmt.Errorf("netease openapi album not found: %s / %s", artist, album)
+	return "", "", "", fmt.Errorf("netease openapi album not found: %s / %s", artist, album)
 }
 
 func fetchOpenAPIAlbumSongs(albumID string) ([]openAPISong, error) {
@@ -298,7 +300,7 @@ func fetchOpenAPIAlbumSongs(albumID string) ([]openAPISong, error) {
 }
 
 func GetOpenAPIAlbumTrackTitles(artist, album string) (map[int]string, string, error) {
-	albumID, albumName, err := searchOpenAPIAlbumID(artist, album)
+	albumID, albumName, _, err := searchOpenAPIAlbumID(artist, album)
 	if err != nil {
 		return nil, "", err
 	}
@@ -317,4 +319,8 @@ func GetOpenAPIAlbumTrackTitles(artist, album string) (map[int]string, string, e
 	}
 	log.Printf("[Netease OpenAPI] album=%s id=%s tracks=%d", albumName, albumID, len(tracks))
 	return tracks, "openapi", nil
+}
+
+func TestSearch(artist, album string) (string, string, string, error) {
+    return searchOpenAPIAlbumID(artist, album)
 }
