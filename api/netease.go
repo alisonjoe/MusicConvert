@@ -876,6 +876,19 @@ func searchSongAndMatch(query, targetTitle, targetArtist, albumHint string, pref
 func GetTranslatedArtistAlbum(artist, album string) (string, string, string, string, string) {
 	canonical := GetArtistCanonicalName(artist)
 
+	if IsOpenAPIEnabled() {
+		id, name, picUrl, err := searchOpenAPIAlbumID(artist, album)
+		if err != nil && canonical != artist {
+			id, name, picUrl, err = searchOpenAPIAlbumID(canonical, album)
+		}
+		if err == nil && id != "" {
+			albumName := PreferDetailedAlbumName(name, album)
+			log.Printf("[Album Cover] Found cover via Netease OpenAPI for %s / %s: %s", artist, album, picUrl)
+			return canonical, canonical, albumName, picUrl, ""
+		}
+		log.Printf("[Album Cover] OpenAPI search failed for %s / %s: %v, falling back to Web API", artist, album, err)
+	}
+
 	id, name, picUrl, year := FindAlbumMeta(artist, album)
 	if id <= 0 && canonical != artist {
 		id, name, picUrl, year = FindAlbumMeta(canonical, album)
