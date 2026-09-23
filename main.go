@@ -1,7 +1,6 @@
 package main
 
 import (
-	"path/filepath"
 	"MusicConvert/api"
 	"MusicConvert/audio"
 	"MusicConvert/config"
@@ -16,6 +15,8 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 
@@ -129,6 +130,19 @@ func initLogFile() io.Closer {
 	log.SetOutput(io.MultiWriter(os.Stdout, writer))
 	log.Printf("Log file: %s (rotate at %d MB, keep %d files)", logPath, logMaxBytes/1024/1024, logMaxFiles)
 	return writer
+}
+
+func init() {
+	extraPaths := []string{
+		"/opt/bin",
+		"/opt/sbin",
+		"/usr/local/bin",
+		"/usr/local/sbin",
+		"/var/packages/ffmpeg/target/bin",
+		"/var/packages/CodecPack/target/bin",
+	}
+	currentPath := os.Getenv("PATH")
+	os.Setenv("PATH", strings.Join(extraPaths, ":")+":"+currentPath)
 }
 
 func CheckEnvironment() {
