@@ -1152,6 +1152,17 @@ PROCESS_PATH:
 	if len(trackTitles) > trackCount {
 		trackCount = len(trackTitles)
 	}
+	if originalTrackNum <= 0 && len(trackTitles) > 0 {
+		cleanOfficial := cleanTitleForMatch(officialTitle)
+		for num, onlineTitle := range trackTitles {
+			cleanOnline := cleanTitleForMatch(onlineTitle)
+			if cleanOfficial == cleanOnline || strings.Contains(cleanOfficial, cleanOnline) || strings.Contains(cleanOnline, cleanOfficial) {
+				trackNum = num
+				log.Printf("[Track Number Recovery] Inferred track %02d for %q (matched %q from %s)", trackNum, officialTitle, onlineTitle, trackTitleSource)
+				break
+			}
+		}
+	}
 	resolvedTitle := titleFromOnlineTrack(trackNum, officialTitle, trackTitles, classicalMeta)
 	if resolvedTitle != officialTitle {
 		log.Printf("[Track Title] %02d %q -> %q (source: %s)", trackNum, officialTitle, resolvedTitle, trackTitleSource)
@@ -1165,6 +1176,10 @@ PROCESS_PATH:
 	}
 
 	coverPath := ""
+	if coverUrl == "" && itunesMeta.CoverUrl != "" {
+		coverUrl = itunesMeta.CoverUrl
+		log.Printf("[Cover Fallback] Using iTunes high-res cover for %s / %s: %s", finalMainArtist, officialAlbum, coverUrl)
+	}
 	if coverUrl != "" {
 		tmpPath := filepath.Join(albumPath, "folder.jpg")
 		if _, err := os.Stat(tmpPath); os.IsNotExist(err) {
@@ -1379,6 +1394,10 @@ func cueConvert(ctx context.Context, st model.MusicFileInfo, outRoot string, bat
 	}
 
 	coverPath := ""
+	if coverUrl == "" && itunesMeta.CoverUrl != "" {
+		coverUrl = itunesMeta.CoverUrl
+		log.Printf("[Cover Fallback] Using iTunes high-res cover for %s / %s: %s", finalMainArtist, officialAlbum, coverUrl)
+	}
 	if coverUrl != "" {
 		tmpPath := filepath.Join(albumPath, "folder.jpg")
 		if _, err := os.Stat(tmpPath); os.IsNotExist(err) {
@@ -1456,4 +1475,53 @@ func cueConvert(ctx context.Context, st model.MusicFileInfo, outRoot string, bat
 	}
 	writeMissingTracksReport(basePath, n, cueTrackTitles, reportSource)
 	return nil
+}
+
+func cleanTitleForMatch(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	for {
+		start := strings.IndexAny(s, "([<")
+		if start < 0 {
+			// check chinese parens
+			start = strings.Index(s, "(")
+			if start < 0 {
+				start = strings.Index(s, "（")
+			}
+			if start < 0 {
+				start = strings.Index(s, "【")
+			}
+			if start < 0 {
+				start = strings.Index(s, "《")
+			}
+		}
+		if start < 0 {
+			break
+		}
+		end := strings.IndexAny(s[start:], ")]>")
+		if end < 0 {
+			end = strings.Index(s[start:], ")")
+			if end < 0 {
+				end = strings.Index(s[start:], "）")
+			}
+			if end < 0 {
+				end = strings.Index(s[start:], "】")
+			}
+			if end < 0 {
+				end = strings.Index(s[start:], "》")
+			}
+		}
+		if end < 0 {
+			s = s[:start]
+			break
+		}
+		s = s[:start] + s[start+end+1:]
+	}
+	remove := ` 	
+-_·・,，.。:：;；!！?？'"/&`
+	return strings.Map(func(r rune) rune {
+		if strings.ContainsRune(remove, r) {
+			return -1
+		}
+		return r
+	}, s)
 }
