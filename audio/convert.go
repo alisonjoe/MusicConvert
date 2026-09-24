@@ -1153,10 +1153,8 @@ PROCESS_PATH:
 		trackCount = len(trackTitles)
 	}
 	if originalTrackNum <= 0 && len(trackTitles) > 0 {
-		cleanOfficial := cleanTitleForMatch(officialTitle)
 		for num, onlineTitle := range trackTitles {
-			cleanOnline := cleanTitleForMatch(onlineTitle)
-			if cleanOfficial == cleanOnline || strings.Contains(cleanOfficial, cleanOnline) || strings.Contains(cleanOnline, cleanOfficial) {
+			if titleMatches(officialTitle, onlineTitle) || titleMatches(filename, onlineTitle) {
 				trackNum = num
 				log.Printf("[Track Number Recovery] Inferred track %02d for %q (matched %q from %s)", trackNum, officialTitle, onlineTitle, trackTitleSource)
 				break
@@ -1478,37 +1476,31 @@ func cueConvert(ctx context.Context, st model.MusicFileInfo, outRoot string, bat
 }
 
 func cleanTitleForMatch(s string) string {
-	s = strings.ToLower(strings.TrimSpace(s))
+	s = util.ToSimplifiedChinese(strings.TrimSpace(s))
+	s = strings.ToLower(s)
 	for {
 		start := strings.IndexAny(s, "([<")
 		if start < 0 {
-			// check chinese parens
-			start = strings.Index(s, "(")
-			if start < 0 {
-				start = strings.Index(s, "（")
-			}
-			if start < 0 {
-				start = strings.Index(s, "【")
-			}
-			if start < 0 {
-				start = strings.Index(s, "《")
-			}
+			start = strings.Index(s, "（")
+		}
+		if start < 0 {
+			start = strings.Index(s, "【")
+		}
+		if start < 0 {
+			start = strings.Index(s, "《")
 		}
 		if start < 0 {
 			break
 		}
 		end := strings.IndexAny(s[start:], ")]>")
 		if end < 0 {
-			end = strings.Index(s[start:], ")")
-			if end < 0 {
-				end = strings.Index(s[start:], "）")
-			}
-			if end < 0 {
-				end = strings.Index(s[start:], "】")
-			}
-			if end < 0 {
-				end = strings.Index(s[start:], "》")
-			}
+			end = strings.Index(s[start:], "）")
+		}
+		if end < 0 {
+			end = strings.Index(s[start:], "】")
+		}
+		if end < 0 {
+			end = strings.Index(s[start:], "》")
 		}
 		if end < 0 {
 			s = s[:start]
@@ -1516,6 +1508,8 @@ func cleanTitleForMatch(s string) string {
 		}
 		s = s[:start] + s[start+end+1:]
 	}
+	s = strings.ReplaceAll(s, "得", "的")
+	s = strings.ReplaceAll(s, "地", "的")
 	remove := ` 	
 -_·・,，.。:：;；!！?？'"/&`
 	return strings.Map(func(r rune) rune {
@@ -1524,4 +1518,54 @@ func cleanTitleForMatch(s string) string {
 		}
 		return r
 	}, s)
+}
+
+func titleMatches(a, b string) bool {
+	ca := cleanTitleForMatch(a)
+	cb := cleanTitleForMatch(b)
+	if ca == "" || cb == "" {
+		return false
+	}
+	if ca == cb {
+		return true
+	}
+	if strings.Contains(ca, cb) || strings.Contains(cb, ca) {
+		return true
+	}
+	ra, rb := []rune(ca), []rune(cb)
+	la, lb := len(ra), len(rb)
+	if la >= 3 && lb >= 3 {
+		diff := la - lb
+		if diff < 0 {
+			diff = -diff
+		}
+		if diff <= 1 {
+			if runeLevenshtein(ra, rb) <= 1 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func runeLevenshtein(ra, rb []rune) int {
+	la, lb := len(ra), len(rb)
+	d := make([][]int, la+1)
+	for i := range d {
+		d[i] = make([]int, lb+1)
+		d[i][0] = i
+	}
+	for j := 0; j <= lb; j++ {
+		d[0][j] = j
+	}
+	for i := 1; i <= la; i++ {
+		for j := 1; j <= lb; j++ {
+			cost := 0
+			if ra[i-1] != rb[j-1] {
+				cost = 1
+			}
+			d[i][j] = min(d[i-1][j]+1, min(d[i][j-1]+1, d[i-1][j-1]+cost))
+		}
+	}
+	return d[la][lb]
 }
