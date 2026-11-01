@@ -26,13 +26,17 @@ graph TD
 
 | Path | Module Name | Language / Framework | Description |
 | :--- | :--- | :--- | :--- |
-| `api/` | Metadata APIs | Go | 与外部音乐元数据服务（Discogs, iTunes, MusicBrainz, NetEase, Spotify, Wikipedia）交互 |
-| `audio/` | Audio Processor | Go | 音频转码逻辑（FFmpeg/FFprobe/metaflac 调用）及 CUE 文件处理 |
-| `config/` | Config Manager | Go / YAML | 集中化配置管理（读取 `config.yaml`） |
-| `db/` | Database | Go / SQLite | 本地 SQLite 数据库操作，存储和管理转码记录 (`music.go`) |
-| `model/` | Data Models | Go | 核心数据结构定义 (`comm.go`) |
-| `util/` | Utilities | Go | 通用工具库：简繁体转换、命令行执行、文件系统操作等 |
-| `scripts/` | Automation Scripts | PowerShell / Bash | 自动化、质量门禁与构建脚本 |
+| `crates/music-core/` | Core Domain & DB | Rust / Cargo | 核心领域模型、配置解析、SQLite 持久化、中文简繁/标点/路径清洗 |
+| `crates/music-provider/` | Metadata Provider Chain | Rust / Cargo | 异步元数据责任链 (MusicBrainz, NetEase, iTunes, etc.)，中文本地化保护 |
+| `crates/music-audio/` | Audio Pipeline Engine | Rust / Cargo | 异步 ffmpeg/metaflac 调用、纯 Rust CUE 解析、多碟路径与 missing_tracks 管理 |
+| `crates/music-convert/` | Daemon & CLI Entry | Rust / Cargo | CLI 命令行入口、ReleaseBatch 目录扫描聚合、notify 文件监听守护进程 |
+| `api/` | Metadata APIs (Go) | Go | 原 Go 版外部音乐元数据服务交互 |
+| `audio/` | Audio Processor (Go) | Go | 原 Go 版音频转码与 CUE 处理 |
+| `config/` | Config Manager (Go) | Go / YAML | 原 Go 版配置管理 |
+| `db/` | Database (Go) | Go / SQLite | 原 Go 版 SQLite 操作 |
+| `model/` | Data Models (Go) | Go | 原 Go 版核心数据结构 |
+| `util/` | Utilities (Go) | Go | 原 Go 版通用工具库 |
+| `scripts/` | Automation Scripts | Bash / PowerShell | 跨平台自动化调度、门禁自检与构建脚本 |
 
 ---
 
