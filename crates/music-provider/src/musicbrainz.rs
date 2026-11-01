@@ -1,15 +1,15 @@
-use std::sync::Arc;
-use std::time::Duration;
+use crate::error::ProviderError;
+use crate::query::MetadataQuery;
+use crate::trait_provider::MetadataProvider;
 use async_trait::async_trait;
 use music_core::{ReleaseMetadata, TrackMetadata};
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, USER_AGENT};
 use reqwest::Client;
 use serde::Deserialize;
+use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
-use crate::error::ProviderError;
-use crate::query::MetadataQuery;
-use crate::trait_provider::MetadataProvider;
 
 pub struct MusicBrainzProvider {
     client: Client,
@@ -26,7 +26,9 @@ impl MusicBrainzProvider {
         let mut headers = HeaderMap::new();
         headers.insert(
             USER_AGENT,
-            HeaderValue::from_static("MusicConvertTool/1.2.0 ( https://github.com/alisonjoe/MusicConvert )"),
+            HeaderValue::from_static(
+                "MusicConvertTool/1.2.0 ( https://github.com/alisonjoe/MusicConvert )",
+            ),
         );
         headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
 
@@ -107,13 +109,22 @@ impl MetadataProvider for MusicBrainzProvider {
         "MusicBrainz"
     }
 
-    async fn search_release(&self, query: &MetadataQuery) -> Result<Option<ReleaseMetadata>, ProviderError> {
+    async fn search_release(
+        &self,
+        query: &MetadataQuery,
+    ) -> Result<Option<ReleaseMetadata>, ProviderError> {
         self.rate_limit().await;
 
         let lucene_query = if let Some(cat) = &query.catalog_id {
-            format!("catno:\"{}\" OR (release:\"{}\" AND artist:\"{}\")", cat, query.album, query.artist)
+            format!(
+                "catno:\"{}\" OR (release:\"{}\" AND artist:\"{}\")",
+                cat, query.album, query.artist
+            )
         } else {
-            format!("release:\"{}\" AND artist:\"{}\"", query.album, query.artist)
+            format!(
+                "release:\"{}\" AND artist:\"{}\"",
+                query.album, query.artist
+            )
         };
 
         let url = format!("{}/release", self.base_url);

@@ -1,13 +1,13 @@
-use std::collections::HashSet;
-use std::fs;
-use std::path::Path;
-use std::sync::Arc;
 use music_audio::{
     build_track_filename, convert_single_track, parse_cue_file, probe_metadata,
     resolve_album_output_dir, resolve_disc_output_dir, split_cue_track, sync_missing_tracks,
 };
 use music_core::{Config, Database, MusicFileInfo, ReleaseBatch, TrackMetadata};
 use music_provider::{MetadataQuery, ProviderChain};
+use std::collections::HashSet;
+use std::fs;
+use std::path::Path;
+use std::sync::Arc;
 use tracing::{error, info};
 
 pub struct ConvertOrchestrator {
@@ -108,10 +108,14 @@ impl ConvertOrchestrator {
         let final_year = online_meta.as_ref().and_then(|m| m.year.clone());
 
         let out_root = Path::new(&self.config.output_root);
-        let album_out_dir = resolve_album_output_dir(out_root, &final_artist, &final_album, final_year.as_deref());
+        let album_out_dir =
+            resolve_album_output_dir(out_root, &final_artist, &final_album, final_year.as_deref());
 
         if let Err(e) = fs::create_dir_all(&album_out_dir) {
-            error!("[Orchestrator] Failed to create output directory {:?}: {}", album_out_dir, e);
+            error!(
+                "[Orchestrator] Failed to create output directory {:?}: {}",
+                album_out_dir, e
+            );
             return;
         }
 
@@ -154,6 +158,7 @@ impl ConvertOrchestrator {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn convert_file_item(
         &self,
         item: &MusicFileInfo,
@@ -165,7 +170,10 @@ impl ConvertOrchestrator {
         present_tracks: &mut HashSet<u32>,
     ) {
         // Disc resolution: check if parent folder is CD1/CD2
-        let file_path = item.file_path.as_ref().or(item.cue_path.as_ref()).unwrap();
+        let file_path = match item.file_path.as_ref().or(item.cue_path.as_ref()) {
+            Some(p) => p,
+            None => return,
+        };
         let parent_name = file_path
             .parent()
             .and_then(|p| p.file_name())
@@ -183,65 +191,68 @@ impl ConvertOrchestrator {
         let _ = fs::create_dir_all(&disc_out_dir);
 
         // Case A: Split CUE sheet
-        if self.config.is_split && item.cue_path.is_some() && item.file_path.is_some() {
-            let cue_path = item.cue_path.as_ref().unwrap();
-            let audio_path = item.file_path.as_ref().unwrap();
+        if self.config.is_split {
+            if let (Some(cue_path), Some(audio_path)) = (&item.cue_path, &item.file_path) {
+                if let Ok(sheet) = parse_cue_file(cue_path) {
+                    for track in sheet.tracks {
+                        let title = if let Some(meta) = online_meta {
+                            meta.tracks
+                                .iter()
+                                .find(|t| t.track_number == track.track_num)
+                                .map(|t| t.title.as_str())
+                                .unwrap_or(&track.title)
+                        } else {
+                            &track.title
+                        };
 
-            if let Ok(sheet) = parse_cue_file(cue_path) {
-                for track in sheet.tracks {
-                    let title = if let Some(meta) = online_meta {
-                        meta.tracks
-                            .iter()
-                            .find(|t| t.track_number == track.track_num)
-                            .map(|t| t.title.as_str())
-                            .unwrap_or(&track.title)
-                    } else {
-                        &track.title
-                    };
+                        let out_filename =
+                            build_track_filename(track.track_num, title, &self.config.desc_type);
+                        let dst_file = disc_out_dir.join(out_filename);
 
-                    let out_filename = build_track_filename(track.track_num, title, &self.config.desc_type);
-                    let dst_file = disc_out_dir.join(out_filename);
+                        let track_meta = TrackMetadata {
+                            track_number: track.track_num,
+                            title: title.to_string(),
+                            artist: artist.to_string(),
+                            album: album.to_string(),
+                            album_artist: Some(artist.to_string()),
+                            year: year.map(|y| y.to_string()),
+                            disc_number: Some(disc_num),
+                            disc_total: Some(disc_total),
+                            ..Default::default()
+                        };
 
-                    let track_meta = TrackMetadata {
-                        track_number: track.track_num,
-                        title: title.to_string(),
-                        artist: artist.to_string(),
-                        album: album.to_string(),
-                        album_artist: Some(artist.to_string()),
-                        year: year.map(|y| y.to_string()),
-                        disc_number: Some(disc_num),
-                        disc_total: Some(disc_total),
-                        ..Default::default()
-                    };
-
-                    match split_cue_track(
-                        audio_path,
-                        &dst_file,
-                        track.index01_seconds,
-                        track.duration_seconds,
-                        Some(&track_meta),
-                        &self.config.desc_type,
-                    )
-                    .await
-                    {
-                        Ok(_) => {
-                            present_tracks.insert(track.track_num);
-                        }
-                        Err(e) => {
-                            error!("[Orchestrator] Failed to split track {}: {}", track.track_num, e);
+                        match split_cue_track(
+                            audio_path,
+                            &dst_file,
+                            track.index01_seconds,
+                            track.duration_seconds,
+                            Some(&track_meta),
+                            &self.config.desc_type,
+                        )
+                        .await
+                        {
+                            Ok(_) => {
+                                present_tracks.insert(track.track_num);
+                            }
+                            Err(e) => {
+                                error!(
+                                    "[Orchestrator] Failed to split track {}: {}",
+                                    track.track_num, e
+                                );
+                            }
                         }
                     }
-                }
 
-                // Mark CUE and source file as processed
-                let _ = self.db.insert(&cue_path.to_string_lossy(), 1);
-                let _ = self.db.insert(&audio_path.to_string_lossy(), 1);
+                    // Mark CUE and source file as processed
+                    let _ = self.db.insert(&cue_path.to_string_lossy(), 1);
+                    let _ = self.db.insert(&audio_path.to_string_lossy(), 1);
 
-                if self.config.is_del_src {
-                    let _ = fs::remove_file(cue_path);
-                    let _ = fs::remove_file(audio_path);
+                    if self.config.is_del_src {
+                        let _ = fs::remove_file(cue_path);
+                        let _ = fs::remove_file(audio_path);
+                    }
+                    return;
                 }
-                return;
             }
         }
 
@@ -268,7 +279,14 @@ impl ConvertOrchestrator {
                 ..Default::default()
             };
 
-            match convert_single_track(src_audio, &dst_file, Some(&track_meta), &self.config.desc_type).await {
+            match convert_single_track(
+                src_audio,
+                &dst_file,
+                Some(&track_meta),
+                &self.config.desc_type,
+            )
+            .await
+            {
                 Ok(_) => {
                     present_tracks.insert(track_no);
                     let _ = self.db.insert(&src_audio.to_string_lossy(), 1);
@@ -277,7 +295,10 @@ impl ConvertOrchestrator {
                     }
                 }
                 Err(e) => {
-                    error!("[Orchestrator] Failed to convert single file {:?}: {}", src_audio, e);
+                    error!(
+                        "[Orchestrator] Failed to convert single file {:?}: {}",
+                        src_audio, e
+                    );
                 }
             }
         }

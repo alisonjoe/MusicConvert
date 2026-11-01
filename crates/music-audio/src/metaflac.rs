@@ -1,6 +1,6 @@
-use std::path::Path;
 use crate::command::run_command;
 use crate::error::AudioError;
+use std::path::Path;
 
 pub async fn apply_flac_tags<P: AsRef<Path>>(
     flac_file: P,

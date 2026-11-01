@@ -1,8 +1,8 @@
-use std::path::Path;
-use music_core::TrackMetadata;
 use crate::command::run_command;
 use crate::error::AudioError;
 use crate::metaflac::apply_flac_tags;
+use music_core::TrackMetadata;
+use std::path::Path;
 
 pub async fn convert_single_track<P: AsRef<Path>, Q: AsRef<Path>>(
     src_file: P,
@@ -13,11 +13,7 @@ pub async fn convert_single_track<P: AsRef<Path>, Q: AsRef<Path>>(
     let src_str = src_file.as_ref().to_string_lossy();
     let dst_str = dst_file.as_ref().to_string_lossy();
 
-    let mut args: Vec<String> = vec![
-        "-y".to_string(),
-        "-i".to_string(),
-        src_str.to_string(),
-    ];
+    let mut args: Vec<String> = vec!["-y".to_string(), "-i".to_string(), src_str.to_string()];
 
     if desc_type.eq_ignore_ascii_case("FLAC") {
         args.push("-c:a".to_string());
@@ -88,11 +84,7 @@ pub async fn split_cue_track<P: AsRef<Path>, Q: AsRef<Path>>(
 
     let start_str = format!("{:.3}", start_seconds);
 
-    let mut args: Vec<String> = vec![
-        "-y".to_string(),
-        "-ss".to_string(),
-        start_str,
-    ];
+    let mut args: Vec<String> = vec!["-y".to_string(), "-ss".to_string(), start_str];
 
     if let Some(dur) = duration_seconds {
         args.push("-t".to_string());

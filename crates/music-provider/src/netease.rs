@@ -1,12 +1,12 @@
-use std::time::Duration;
+use crate::error::ProviderError;
+use crate::query::MetadataQuery;
+use crate::trait_provider::MetadataProvider;
 use async_trait::async_trait;
 use music_core::{ReleaseMetadata, TrackMetadata};
 use reqwest::header::{HeaderMap, HeaderValue, COOKIE, REFERER, USER_AGENT};
 use reqwest::Client;
 use serde::Deserialize;
-use crate::error::ProviderError;
-use crate::query::MetadataQuery;
-use crate::trait_provider::MetadataProvider;
+use std::time::Duration;
 
 pub struct NeteaseProvider {
     client: Client,
@@ -22,7 +22,9 @@ impl NeteaseProvider {
         let mut headers = HeaderMap::new();
         headers.insert(
             USER_AGENT,
-            HeaderValue::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"),
+            HeaderValue::from_static(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            ),
         );
         headers.insert(REFERER, HeaderValue::from_static("https://music.163.com/"));
         if let Some(c) = cookie {
@@ -107,7 +109,10 @@ impl MetadataProvider for NeteaseProvider {
         "NetEase"
     }
 
-    async fn search_release(&self, query: &MetadataQuery) -> Result<Option<ReleaseMetadata>, ProviderError> {
+    async fn search_release(
+        &self,
+        query: &MetadataQuery,
+    ) -> Result<Option<ReleaseMetadata>, ProviderError> {
         let search_text = format!("{} {}", query.album, query.artist);
         let url = format!("{}/search/get/web", self.base_url);
 
@@ -169,8 +174,16 @@ impl MetadataProvider for NeteaseProvider {
 
         let mut tracks = Vec::new();
         for (idx, song) in detail_data.songs.iter().enumerate() {
-            let disc_num = song.cd.as_deref().and_then(|s| s.parse::<u32>().ok()).unwrap_or(1);
-            let track_no = if song.no > 0 { song.no } else { (idx + 1) as u32 };
+            let disc_num = song
+                .cd
+                .as_deref()
+                .and_then(|s| s.parse::<u32>().ok())
+                .unwrap_or(1);
+            let track_no = if song.no > 0 {
+                song.no
+            } else {
+                (idx + 1) as u32
+            };
             tracks.push(TrackMetadata {
                 track_number: track_no,
                 title: song.name.clone(),

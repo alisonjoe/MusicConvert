@@ -1,10 +1,9 @@
-use std::path::{Path, PathBuf};
 use regex::Regex;
+use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
-static RE_DOS_8_3: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)^[a-z0-9]{5,8}~[a-z0-9]$").unwrap()
-});
+static RE_DOS_8_3: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)^[a-z0-9]{5,8}~[a-z0-9]$").unwrap());
 
 pub fn sanitize_filename(filename: &str) -> String {
     let mut cleaned: String = filename
@@ -139,7 +138,10 @@ mod tests {
     #[test]
     fn test_sanitize_filename() {
         assert_eq!(sanitize_filename("Mono Inc.  "), "Mono Inc");
-        assert_eq!(sanitize_filename("Artist / Track : Name?"), "Artist - Track - Name-");
+        assert_eq!(
+            sanitize_filename("Artist / Track : Name?"),
+            "Artist - Track - Name-"
+        );
         assert_eq!(sanitize_filename("   "), "Unknown");
         assert_eq!(sanitize_filename("Valid.Title..."), "Valid.Title");
     }

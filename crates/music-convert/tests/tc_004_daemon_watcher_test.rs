@@ -1,11 +1,11 @@
-use std::fs::{create_dir_all, File};
-use std::sync::Arc;
 use clap::Parser;
 use music_convert::cli::Cli;
 use music_convert::orchestrator::ConvertOrchestrator;
 use music_convert::scanner::scan_release_batches;
 use music_core::{Config, Database, MusicFileInfo, ReleaseBatch};
 use music_provider::ProviderChain;
+use std::fs::{create_dir_all, File};
+use std::sync::Arc;
 use tempfile::tempdir;
 
 #[tokio::test]
@@ -28,23 +28,34 @@ async fn test_tc_004_daemon_watcher_spec() {
     File::create(&f2).unwrap();
 
     let batches = scan_release_batches(root);
-    assert_eq!(batches.len(), 1, "Discs CD1 and CD2 must be aggregated into one ReleaseBatch");
+    assert_eq!(
+        batches.len(),
+        1,
+        "Discs CD1 and CD2 must be aggregated into one ReleaseBatch"
+    );
     assert_eq!(batches[0].release_context, album_dir);
     assert_eq!(batches[0].files.len(), 2);
 
     // Step 2: CUE and Audio pairing validation
-    let paired = batches[0].files.iter().find(|f| f.file_path == Some(f1.clone())).unwrap();
+    let paired = batches[0]
+        .files
+        .iter()
+        .find(|f| f.file_path == Some(f1.clone()))
+        .unwrap();
     assert_eq!(paired.cue_path, Some(c1));
 
     // Step 3: CLI parsing verification
-    let cli = Cli::try_parse_from(&["MusicConvert", "--rescan", "/music/test", "--rescan-all"]).unwrap();
+    let cli =
+        Cli::try_parse_from(["MusicConvert", "--rescan", "/music/test", "--rescan-all"]).unwrap();
     assert_eq!(cli.rescan, Some("/music/test".to_string()));
     assert!(cli.rescan_all);
 
     // Step 4: Batch orchestration idempotency & DB mark
     let db = Arc::new(Database::open_in_memory().unwrap());
-    let mut config = Config::default();
-    config.output_root = temp.path().join("output").to_string_lossy().to_string();
+    let config = Config {
+        output_root: temp.path().join("output").to_string_lossy().to_string(),
+        ..Default::default()
+    };
 
     let chain = Arc::new(ProviderChain::new());
     let orch = ConvertOrchestrator::new(config, db.clone(), chain);
@@ -56,13 +67,11 @@ async fn test_tc_004_daemon_watcher_spec() {
     // Process batch (f1 is skipped, only remaining files considered)
     let batch = ReleaseBatch {
         release_context: album_dir,
-        files: vec![
-            MusicFileInfo {
-                file_path: Some(f1.clone()),
-                file_suffix: "FLAC".to_string(),
-                cue_path: None,
-            },
-        ],
+        files: vec![MusicFileInfo {
+            file_path: Some(f1.clone()),
+            file_suffix: "FLAC".to_string(),
+            cue_path: None,
+        }],
     };
     orch.process_batch(&batch).await;
 }

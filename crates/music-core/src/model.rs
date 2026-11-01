@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MusicType {
@@ -30,7 +30,7 @@ impl MusicType {
 }
 
 pub const SUPPORTED_AUDIO_EXTENSIONS: &[&str] = &[
-    "FLAC", "APE", "WAV", "CUE", "MP3", "M4A", "DFF", "DSF", "WV", "WMA"
+    "FLAC", "APE", "WAV", "CUE", "MP3", "M4A", "DFF", "DSF", "WV", "WMA",
 ];
 
 pub fn is_supported_extension(ext: &str) -> bool {

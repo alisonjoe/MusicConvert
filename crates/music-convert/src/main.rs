@@ -1,6 +1,3 @@
-use std::fs::create_dir_all;
-use std::path::Path;
-use std::sync::Arc;
 use clap::Parser;
 use music_convert::cli::Cli;
 use music_convert::orchestrator::ConvertOrchestrator;
@@ -8,6 +5,9 @@ use music_convert::scanner::scan_release_batches;
 use music_convert::watcher::watch_directory;
 use music_core::{Config, Database};
 use music_provider::ProviderChain;
+use std::fs::create_dir_all;
+use std::path::Path;
+use std::sync::Arc;
 use tracing::{info, warn};
 use tracing_appender::rolling;
 use tracing_subscriber::fmt;
@@ -38,7 +38,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         info!("Loading configuration from {:?}", config_path);
         Config::load_from_file(config_path)?
     } else {
-        warn!("Config file not found at {:?}, using default settings", config_path);
+        warn!(
+            "Config file not found at {:?}, using default settings",
+            config_path
+        );
         Config::default()
     };
 
@@ -49,14 +52,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // 4. Handle CLI rescan flags
     if cli.rescan_all {
         let deleted = db.delete_all()?;
-        info!("[CLI] --rescan-all executed: cleared {} records from DB", deleted);
+        info!(
+            "[CLI] --rescan-all executed: cleared {} records from DB",
+            deleted
+        );
     } else if let Some(prefix) = &cli.rescan {
         let deleted = db.delete_by_prefix(prefix)?;
-        info!("[CLI] --rescan executed: cleared {} records under prefix {:?}", deleted, prefix);
+        info!(
+            "[CLI] --rescan executed: cleared {} records under prefix {:?}",
+            deleted, prefix
+        );
     }
 
     if cli.test_spotify {
-        info!("[CLI] --test-spotify: spotify_enabled = {}", config.is_spotify_enabled());
+        info!(
+            "[CLI] --test-spotify: spotify_enabled = {}",
+            config.is_spotify_enabled()
+        );
         return Ok(());
     }
 

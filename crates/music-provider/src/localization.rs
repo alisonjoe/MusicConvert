@@ -1,7 +1,7 @@
+use crate::query::MetadataQuery;
 use music_core::{
     normalize_classical_no, remove_discogs_suffix, to_simplified_chinese, ReleaseMetadata,
 };
-use crate::query::MetadataQuery;
 
 pub fn localize_metadata(query: &MetadataQuery, meta: &mut ReleaseMetadata) {
     // 1. If local context already has a reliable Chinese artist, protect it from English overwrite
@@ -19,7 +19,10 @@ pub fn localize_metadata(query: &MetadataQuery, meta: &mut ReleaseMetadata) {
 
     // 3. Normalize track metadata
     for track in &mut meta.tracks {
-        if query.has_chinese_context && !query.artist.is_empty() && !track.artist.chars().any(is_cjk) {
+        if query.has_chinese_context
+            && !query.artist.is_empty()
+            && !track.artist.chars().any(is_cjk)
+        {
             track.artist = query.artist.clone();
         }
         track.artist = clean_identity_string(&track.artist);

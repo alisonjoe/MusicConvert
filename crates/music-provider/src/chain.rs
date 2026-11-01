@@ -1,6 +1,3 @@
-use std::sync::Arc;
-use music_core::{Config, ReleaseMetadata};
-use tracing::{debug, info, warn};
 use crate::error::ProviderError;
 use crate::itunes::ITunesProvider;
 use crate::localization::localize_metadata;
@@ -8,6 +5,9 @@ use crate::musicbrainz::MusicBrainzProvider;
 use crate::netease::NeteaseProvider;
 use crate::query::MetadataQuery;
 use crate::trait_provider::MetadataProvider;
+use music_core::{Config, ReleaseMetadata};
+use std::sync::Arc;
+use tracing::{debug, info, warn};
 
 pub struct ProviderChain {
     providers: Vec<Arc<dyn MetadataProvider>>,
@@ -44,7 +44,10 @@ impl ProviderChain {
         chain
     }
 
-    pub async fn fetch(&self, query: &MetadataQuery) -> Result<Option<ReleaseMetadata>, ProviderError> {
+    pub async fn fetch(
+        &self,
+        query: &MetadataQuery,
+    ) -> Result<Option<ReleaseMetadata>, ProviderError> {
         info!(
             "[ProviderChain] Querying metadata for artist={:?} album={:?} (chinese_ctx={})",
             query.artist, query.album, query.has_chinese_context
@@ -73,7 +76,10 @@ impl ProviderChain {
                     }
                 }
                 Ok(None) => {
-                    debug!("[ProviderChain] Provider {} returned no match", provider.name());
+                    debug!(
+                        "[ProviderChain] Provider {} returned no match",
+                        provider.name()
+                    );
                 }
                 Err(e) => {
                     warn!(
@@ -85,7 +91,10 @@ impl ProviderChain {
             }
         }
 
-        info!("[ProviderChain] No provider found acceptable metadata for {:?}", query.album);
+        info!(
+            "[ProviderChain] No provider found acceptable metadata for {:?}",
+            query.album
+        );
         Ok(None)
     }
 }

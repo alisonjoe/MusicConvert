@@ -1,11 +1,11 @@
-use std::time::Duration;
+use crate::error::ProviderError;
+use crate::query::MetadataQuery;
+use crate::trait_provider::MetadataProvider;
 use async_trait::async_trait;
 use music_core::{ReleaseMetadata, TrackMetadata};
 use reqwest::Client;
 use serde::Deserialize;
-use crate::error::ProviderError;
-use crate::query::MetadataQuery;
-use crate::trait_provider::MetadataProvider;
+use std::time::Duration;
 
 pub struct ITunesProvider {
     client: Client,
@@ -74,7 +74,10 @@ impl MetadataProvider for ITunesProvider {
         "iTunes"
     }
 
-    async fn search_release(&self, query: &MetadataQuery) -> Result<Option<ReleaseMetadata>, ProviderError> {
+    async fn search_release(
+        &self,
+        query: &MetadataQuery,
+    ) -> Result<Option<ReleaseMetadata>, ProviderError> {
         let term = format!("{} {}", query.album, query.artist);
         let url = format!("{}/search", self.base_url);
 
@@ -130,7 +133,10 @@ impl MetadataProvider for ITunesProvider {
         if let Ok(lookup_resp) = self
             .client
             .get(&lookup_url)
-            .query(&[("id", &collection_id.to_string()), ("entity", &"song".to_string())])
+            .query(&[
+                ("id", &collection_id.to_string()),
+                ("entity", &"song".to_string()),
+            ])
             .send()
             .await
         {
