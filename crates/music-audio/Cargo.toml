@@ -1,0 +1,17 @@
+[package]
+name = "music-audio"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+music-core.workspace = true
+tokio.workspace = true
+thiserror.workspace = true
+regex.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tempfile = "3.17"

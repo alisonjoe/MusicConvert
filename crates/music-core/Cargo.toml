@@ -1,0 +1,21 @@
+[package]
+name = "music-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_yaml.workspace = true
+rusqlite.workspace = true
+thiserror.workspace = true
+regex.workspace = true
+chrono.workspace = true
+unicode-normalization.workspace = true
+ferrous-opencc.workspace = true
+walkdir.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile = "3.17"

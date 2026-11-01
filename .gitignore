@@ -8,6 +8,9 @@ MusicConvert
 musicConvert
 music-convert
 MusicConvert_synology*
+MusicConvert_linux*
+target/
+.worktrees/
 
 # Go 构建
 /bin/

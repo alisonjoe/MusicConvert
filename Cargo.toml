@@ -1,0 +1,39 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/music-core",
+    "crates/music-provider",
+    "crates/music-audio",
+    "crates/music-convert",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["MusicConvert Team"]
+license = "MIT"
+
+[workspace.dependencies]
+music-core = { path = "crates/music-core" }
+music-provider = { path = "crates/music-provider" }
+music-audio = { path = "crates/music-audio" }
+
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+serde_json = "1.0"
+rusqlite = { version = "0.33", features = ["bundled"] }
+tokio = { version = "1.43", features = ["full"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+async-trait = "0.1"
+thiserror = "2.0"
+regex = "1.11"
+chrono = { version = "0.4", features = ["serde"] }
+unicode-normalization = "0.1"
+ferrous-opencc = "0.4"
+notify = "8.0"
+notify-debouncer-mini = "0.6"
+clap = { version = "4.5", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "chrono"] }
+tracing-appender = "0.2"
+walkdir = "2.5"
