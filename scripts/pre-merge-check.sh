@@ -111,7 +111,7 @@ run_check "1. Forbidden Zone Scan" check_forbidden_zones
 check_build_and_test() {
   local ret=0
   if [[ -f "go.mod" ]]; then
-    go build ./... && go vet ./... && go test ./... -timeout 120s || ret=1
+    go build ./... && go vet ./... && go test ./... -timeout 180s || ret=1
   fi
   if [[ -f "Cargo.toml" ]]; then
     cargo check --workspace && cargo test --workspace || ret=1

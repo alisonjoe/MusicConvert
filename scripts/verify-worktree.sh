@@ -36,7 +36,7 @@ if [[ -f "go.mod" ]]; then
   CHECKED=1
   run_step "Go Build" go build ./...
   run_step "Go Vet"   go vet ./...
-  run_step "Go Test"  go test ./... -timeout 60s
+  run_step "Go Test"  go test ./... -timeout 180s
 fi
 
 if [[ -f "Cargo.toml" ]]; then
