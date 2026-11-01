@@ -1054,6 +1054,7 @@ name = "music-provider"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "chrono",
  "music-core",
  "regex",
  "reqwest",
