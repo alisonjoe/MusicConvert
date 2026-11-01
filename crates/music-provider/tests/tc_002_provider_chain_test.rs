@@ -1,9 +1,7 @@
-use std::sync::Arc;
 use async_trait::async_trait;
 use music_core::{ReleaseMetadata, TrackMetadata};
-use music_provider::{
-    MetadataProvider, MetadataQuery, ProviderChain, ProviderError,
-};
+use music_provider::{MetadataProvider, MetadataQuery, ProviderChain, ProviderError};
+use std::sync::Arc;
 
 struct MockFailingProvider;
 
@@ -13,8 +11,14 @@ impl MetadataProvider for MockFailingProvider {
         "MockFailing"
     }
 
-    async fn search_release(&self, _query: &MetadataQuery) -> Result<Option<ReleaseMetadata>, ProviderError> {
-        Err(ProviderError::Custom("MockFailing".to_string(), "Network timeout".to_string()))
+    async fn search_release(
+        &self,
+        _query: &MetadataQuery,
+    ) -> Result<Option<ReleaseMetadata>, ProviderError> {
+        Err(ProviderError::Custom(
+            "MockFailing".to_string(),
+            "Network timeout".to_string(),
+        ))
     }
 }
 
@@ -28,7 +32,10 @@ impl MetadataProvider for MockSuccessProvider {
         "MockSuccess"
     }
 
-    async fn search_release(&self, _query: &MetadataQuery) -> Result<Option<ReleaseMetadata>, ProviderError> {
+    async fn search_release(
+        &self,
+        _query: &MetadataQuery,
+    ) -> Result<Option<ReleaseMetadata>, ProviderError> {
         Ok(Some(self.meta.clone()))
     }
 }
@@ -62,15 +69,15 @@ async fn test_tc_002_provider_chain_fallback_and_localization() {
 
     let chain = ProviderChain::new()
         .with_provider(Arc::new(MockFailingProvider))
-        .with_provider(Arc::new(MockSuccessProvider {
-            meta: success_meta,
-        }));
+        .with_provider(Arc::new(MockSuccessProvider { meta: success_meta }));
 
-    let query = MetadataQuery::new("张学友", "吻别")
-        .with_track_titles(vec!["吻别".to_string()]);
+    let query = MetadataQuery::new("张学友", "吻别").with_track_titles(vec!["吻别".to_string()]);
 
     let result = chain.fetch(&query).await.expect("Fetch failed");
-    assert!(result.is_some(), "Expected chain to return metadata from fallback provider");
+    assert!(
+        result.is_some(),
+        "Expected chain to return metadata from fallback provider"
+    );
 
     let meta = result.unwrap();
 

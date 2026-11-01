@@ -1,7 +1,7 @@
+use crate::error::AudioError;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use crate::error::AudioError;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct CueTrack {
@@ -82,7 +82,10 @@ pub fn parse_cue_content(content: &str) -> CueSheet {
                 sheet.tracks.push(track);
             }
             let parts: Vec<&str> = rest.split_whitespace().collect();
-            let num = parts.first().and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+            let num = parts
+                .first()
+                .and_then(|s| s.parse::<u32>().ok())
+                .unwrap_or(0);
             current_track = Some(CueTrack {
                 track_num: num,
                 ..Default::default()

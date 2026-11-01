@@ -1,7 +1,7 @@
-use async_trait::async_trait;
-use music_core::ReleaseMetadata;
 use crate::error::ProviderError;
 use crate::query::MetadataQuery;
+use async_trait::async_trait;
+use music_core::ReleaseMetadata;
 
 #[async_trait]
 pub trait MetadataProvider: Send + Sync {
@@ -11,5 +11,8 @@ pub trait MetadataProvider: Send + Sync {
         true
     }
 
-    async fn search_release(&self, query: &MetadataQuery) -> Result<Option<ReleaseMetadata>, ProviderError>;
+    async fn search_release(
+        &self,
+        query: &MetadataQuery,
+    ) -> Result<Option<ReleaseMetadata>, ProviderError>;
 }

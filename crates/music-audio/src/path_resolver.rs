@@ -1,5 +1,5 @@
-use std::path::{Path, PathBuf};
 use music_core::sanitize_filename;
+use std::path::{Path, PathBuf};
 
 pub fn resolve_album_output_dir<P: AsRef<Path>>(
     output_root: P,
@@ -66,6 +66,9 @@ mod tests {
     #[test]
     fn test_build_track_filename() {
         assert_eq!(build_track_filename(1, "吻别", "flac"), "01. 吻别.flac");
-        assert_eq!(build_track_filename(12, "Track/Title:?*", "FLAC"), "12. Track-Title---.flac");
+        assert_eq!(
+            build_track_filename(12, "Track/Title:?*", "FLAC"),
+            "12. Track-Title---.flac"
+        );
     }
 }

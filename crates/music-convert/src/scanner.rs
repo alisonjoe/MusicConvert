@@ -1,6 +1,6 @@
+use music_core::{is_supported_extension, resolve_existing_path, MusicFileInfo, ReleaseBatch};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use music_core::{is_supported_extension, resolve_existing_path, MusicFileInfo, ReleaseBatch};
 use walkdir::WalkDir;
 
 pub fn is_disc_directory_name(name: &str) -> bool {
@@ -60,10 +60,7 @@ pub fn scan_release_batches<P: AsRef<Path>>(root: P) -> Vec<ReleaseBatch> {
     let mut batch_map: HashMap<PathBuf, Vec<MusicFileInfo>> = HashMap::new();
 
     for ((parent, _stem), info) in file_map {
-        let dir_name = parent
-            .file_name()
-            .and_then(|s| s.to_str())
-            .unwrap_or("");
+        let dir_name = parent.file_name().and_then(|s| s.to_str()).unwrap_or("");
 
         let release_context = if is_disc_directory_name(dir_name) {
             parent
@@ -108,7 +105,11 @@ mod tests {
         File::create(cd2.join("01.flac")).unwrap();
 
         let batches = scan_release_batches(root);
-        assert_eq!(batches.len(), 1, "CD1 and CD2 must be merged into 1 ReleaseBatch");
+        assert_eq!(
+            batches.len(),
+            1,
+            "CD1 and CD2 must be merged into 1 ReleaseBatch"
+        );
         assert_eq!(batches[0].release_context, album_dir);
         assert_eq!(batches[0].files.len(), 2);
 
@@ -118,6 +119,9 @@ mod tests {
             .iter()
             .find(|f| f.file_path.as_ref().unwrap().parent() == Some(&cd1))
             .unwrap();
-        assert!(cd1_item.cue_path.is_some(), "CUE file must be paired with audio file");
+        assert!(
+            cd1_item.cue_path.is_some(),
+            "CUE file must be paired with audio file"
+        );
     }
 }

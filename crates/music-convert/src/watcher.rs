@@ -1,7 +1,7 @@
+use notify_debouncer_mini::{new_debouncer, DebouncedEvent};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
 use std::time::Duration;
-use notify_debouncer_mini::{new_debouncer, DebouncedEvent};
 use tracing::{error, info};
 
 pub fn watch_directory<P: AsRef<Path>, F>(path: P, mut on_change: F)
@@ -32,10 +32,8 @@ where
     loop {
         match rx.recv() {
             Ok(Ok(events)) => {
-                let paths: Vec<PathBuf> = events
-                    .into_iter()
-                    .map(|e: DebouncedEvent| e.path)
-                    .collect();
+                let paths: Vec<PathBuf> =
+                    events.into_iter().map(|e: DebouncedEvent| e.path).collect();
                 on_change(paths);
             }
             Ok(Err(err)) => {

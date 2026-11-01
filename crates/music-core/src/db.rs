@@ -1,7 +1,7 @@
-use std::path::Path;
-use std::sync::Mutex;
 use chrono::Utc;
 use rusqlite::{params, Connection, OptionalExtension};
+use std::path::Path;
+use std::sync::Mutex;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -78,7 +78,8 @@ impl Database {
 
     pub fn query(&self, music: &str) -> Result<Vec<MusicInfo>, DbError> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT id, music, state, created FROM music_info WHERE music = ?1")?;
+        let mut stmt =
+            conn.prepare("SELECT id, music, state, created FROM music_info WHERE music = ?1")?;
         let rows = stmt.query_map(params![music], |row| {
             Ok(MusicInfo {
                 id: row.get(0)?,

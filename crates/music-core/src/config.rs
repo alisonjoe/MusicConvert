@@ -1,7 +1,7 @@
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use serde::{Deserialize, Deserializer, Serialize};
 
 fn deserialize_bool_or_int<'de, D>(deserializer: D) -> Result<bool, D::Error>
 where
@@ -124,7 +124,9 @@ impl Default for Config {
 }
 
 impl Config {
-    pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+    pub fn load_from_file<P: AsRef<Path>>(
+        path: P,
+    ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let content = fs::read_to_string(path)?;
         let config: Config = serde_yaml::from_str(&content)?;
         Ok(config)

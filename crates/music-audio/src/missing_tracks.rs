@@ -1,8 +1,8 @@
+use crate::error::AudioError;
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use tracing::info;
-use crate::error::AudioError;
 
 pub fn sync_missing_tracks<P: AsRef<Path>>(
     album_dir: P,
@@ -32,7 +32,10 @@ pub fn sync_missing_tracks<P: AsRef<Path>>(
     if missing == 0 {
         if report_path.exists() {
             let _ = fs::remove_file(&report_path);
-            info!("[Missing Tracks] Removed missing_tracks.txt for complete album at {:?}", album_dir.as_ref());
+            info!(
+                "[Missing Tracks] Removed missing_tracks.txt for complete album at {:?}",
+                album_dir.as_ref()
+            );
         }
         return Ok(());
     }
@@ -47,7 +50,10 @@ pub fn sync_missing_tracks<P: AsRef<Path>>(
     content.push("".to_string());
 
     fs::write(&report_path, content.join("\n"))?;
-    info!("[Missing Tracks] Updated {:?} ({} missing, source: {})", report_path, missing, source);
+    info!(
+        "[Missing Tracks] Updated {:?} ({} missing, source: {})",
+        report_path, missing, source
+    );
     Ok(())
 }
 
@@ -62,7 +68,11 @@ mod tests {
         let album_dir = temp.path();
 
         let total = 3;
-        let titles = vec!["Track 1".to_string(), "Track 2".to_string(), "Track 3".to_string()];
+        let titles = vec![
+            "Track 1".to_string(),
+            "Track 2".to_string(),
+            "Track 3".to_string(),
+        ];
         let mut present = HashSet::new();
         present.insert(1);
         present.insert(3); // Track 2 is missing
@@ -79,6 +89,9 @@ mod tests {
         // Now track 2 is added
         present.insert(2);
         sync_missing_tracks(album_dir, total, &titles, &present, "TestOnline").unwrap();
-        assert!(!report_file.exists(), "Complete album must have missing_tracks.txt removed");
+        assert!(
+            !report_file.exists(),
+            "Complete album must have missing_tracks.txt removed"
+        );
     }
 }

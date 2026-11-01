@@ -1,8 +1,8 @@
-use std::collections::HashMap;
-use std::path::Path;
-use serde::Deserialize;
 use crate::command::run_command;
 use crate::error::AudioError;
+use serde::Deserialize;
+use std::collections::HashMap;
+use std::path::Path;
 
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct FfprobeOutput {
@@ -38,7 +38,14 @@ pub async fn probe_metadata<P: AsRef<Path>>(file: P) -> Result<FfprobeOutput, Au
     let p_str = file.as_ref().to_string_lossy();
     let stdout = run_command(
         "ffprobe",
-        &["-v", "quiet", "-print_format", "json", "-show_format", &p_str],
+        &[
+            "-v",
+            "quiet",
+            "-print_format",
+            "json",
+            "-show_format",
+            &p_str,
+        ],
         30,
     )
     .await?;

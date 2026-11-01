@@ -3,17 +3,14 @@ use ferrous_opencc::OpenCC;
 use regex::Regex;
 use std::sync::LazyLock;
 
-static OPENCC_T2S: LazyLock<Option<OpenCC>> = LazyLock::new(|| {
-    OpenCC::from_config(BuiltinConfig::T2s).ok()
-});
+static OPENCC_T2S: LazyLock<Option<OpenCC>> =
+    LazyLock::new(|| OpenCC::from_config(BuiltinConfig::T2s).ok());
 
-static RE_NO_PREFIX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)\bNo\.\s*([0-9]+)").unwrap()
-});
+static RE_NO_PREFIX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\bNo\.\s*([0-9]+)").unwrap());
 
-static RE_DISCOGS_DISAMBIGUATION: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\s*\(\d+\)$").unwrap()
-});
+static RE_DISCOGS_DISAMBIGUATION: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\s*\(\d+\)$").unwrap());
 
 pub fn to_simplified_chinese(s: &str) -> String {
     if s.is_empty() {
@@ -41,7 +38,10 @@ pub fn normalize_classical_no(s: &str) -> String {
     if s.is_empty() {
         return s.to_string();
     }
-    let res = s.replace("№", "No.").replace("N°", "No.").replace("n°", "No.");
+    let res = s
+        .replace("№", "No.")
+        .replace("N°", "No.")
+        .replace("n°", "No.");
     RE_NO_PREFIX.replace_all(&res, "No. $1").to_string()
 }
 
