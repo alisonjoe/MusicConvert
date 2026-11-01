@@ -1,0 +1,27 @@
+[package]
+name = "music-convert"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "MusicConvert"
+path = "src/main.rs"
+
+[dependencies]
+music-core.workspace = true
+music-provider.workspace = true
+music-audio.workspace = true
+tokio.workspace = true
+clap.workspace = true
+notify.workspace = true
+notify-debouncer-mini.workspace = true
+walkdir.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tracing-appender.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile = "3.17"

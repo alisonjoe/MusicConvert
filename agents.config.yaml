@@ -1,0 +1,89 @@
+# ==============================================================================
+# agents.config.yaml — 项目级 AI 原生工程声明式配置文件
+#
+# 本文件是工作区内所有智能体、自动化脚本（Invoke-Build）和质量门禁的单一配置来源。
+# 任何新项目只需填写本配置，即可完整驱动全部 Agentic 研发工作流。
+# ==============================================================================
+
+workspace:
+  name: "my-project"
+  # 项目结构类型:
+  #   - "mono-repo": 当前工作区根目录即为单个独立 Git 仓库
+  #   - "multi-repo": 当前工作区根目录为容器，内含多个独立子 Git 仓库
+  type: "mono-repo"
+
+  # 参与工作流的仓库列表
+  repos:
+    - name: "main"
+      path: "."
+      tech: "go" # 支持: go, node, python, rust, java, flutter 等
+      # 若为 multi-repo，配置多个条目，如:
+      # - name: "backend"
+      #   path: "services/backend"
+      #   tech: "go"
+      # - name: "frontend"
+      #   path: "apps/web"
+      #   tech: "node"
+
+# ------------------------------------------------------------------------------
+# 1. 绝对安全红线与禁区 (Forbidden Zones)
+# ------------------------------------------------------------------------------
+# Pre-commit 钩子与 L3 Pre-merge Gate 自动读取本配置并在提交/合入时扫描拦截。
+# 若有特殊理由需变更禁区，必须在 Commit Message 中加入对应的 waiver_tag 标记。
+security:
+  forbidden_zones:
+    - pattern: "core/models/**"
+      reason: "核心数据模型与数据库实体变更，级联影响系统稳定性"
+      waiver_tag: "[schema]"
+    - pattern: "api/proto/**"
+      reason: "通信协议契约变更，需与前后端/微服务达成一致"
+      waiver_tag: "[proto]"
+    - pattern: "shared/libs/**"
+      reason: "底层共享库与核心工具包"
+      waiver_tag: "[shared]"
+
+  protected_branches:
+    - "master"
+    - "main"
+
+# ------------------------------------------------------------------------------
+# 2. 多技术栈自检指令 (Verification Gate)
+# ------------------------------------------------------------------------------
+# L2 verify-worktree 与 L3 pre-merge-check 会根据改动目录自动匹配并执行对应指令。
+verification:
+  main:
+    build: "go build ./... && cargo check --workspace"
+    lint: "go vet ./..."
+    test: "go test ./... -timeout 60s && cargo test --workspace"
+
+  # 更多多技术栈配置示例:
+  # frontend:
+  #   lint: "pnpm lint"
+  #   test: "pnpm test"
+  # python-service:
+  #   lint: "flake8"
+  #   test: "pytest"
+  # rust-core:
+  #   build: "cargo check"
+  #   test: "cargo test"
+
+# ------------------------------------------------------------------------------
+# 3. 跨端协议代码统一生成 (Unified Codegen)
+# ------------------------------------------------------------------------------
+# 对应指令: pwsh .\Invoke-Build.ps1 codegen [-Check]
+codegen:
+  enabled: false
+  # command: "protoc --go_out=. ..."
+
+# ------------------------------------------------------------------------------
+# 4. 知识沉淀与云端同步 (Cloud Knowledge Base Sync)
+# ------------------------------------------------------------------------------
+# 支持将 Phase 5 交付文档自动同步至知识库平台
+sync:
+  provider: "none" # 支持: "tencent-docs", "feishu", "notion", "none"
+  tencent_docs:
+    collection_doc_id: "" # 智能主页合集 DocID
+    categories:
+      standards: "01_工程研发规范"
+      solutions: "02_业务技术方案"
+      adr: "03_架构决策(ADR)"
