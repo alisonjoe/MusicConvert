@@ -102,7 +102,9 @@
 ## 验证方式
 优先跑最小的相关检查：
 - `go test ./...`
+- `cargo test --workspace`
 - `./scripts/build_synology.sh`
+- `./scripts/build_synology_rust.sh`
 如果改动了元数据匹配或输出命名，最好补 `audio/convert_test.go` 里的定向测试，并用一组代表性样本检查最终目录结构。
 **每次任务完成后，必须生成可用于真实测试的二进制文件。**
 
