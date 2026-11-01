@@ -1,6 +1,7 @@
 # [Ticket-4] Daemon Watcher, ReleaseBatch Orchestration & CLI
 
 - **Spec**: `docs/specs/rust-rewrite.md`
+- **GitHub Issue**: #4
 - **Status**: completed
 - **Merged in**: 5ae4dd8 (main)
 - **Scope**:

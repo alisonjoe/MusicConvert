@@ -1,6 +1,7 @@
 # [Ticket-2] Tracer Bullet: Asynchronous Metadata Provider Chain
 
 - **Spec**: `docs/specs/rust-rewrite.md`
+- **GitHub Issue**: #2
 - **Status**: completed
 - **Merged in**: 5ae4dd8 (main)
 - **Scope**:
