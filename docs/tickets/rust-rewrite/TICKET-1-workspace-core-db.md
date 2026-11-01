@@ -1,6 +1,7 @@
 # [Ticket-1] Prefactor: Cargo Workspace, Core Domain & SQLite Persistence
 
 - **Spec**: `docs/specs/rust-rewrite.md`
+- **GitHub Issue**: #1
 - **Status**: completed
 - **Merged in**: 5ae4dd8 (main)
 - **Scope**:

@@ -1,6 +1,7 @@
 # [Ticket-3] Audio Pipeline & CUE Splitter Engine
 
 - **Spec**: `docs/specs/rust-rewrite.md`
+- **GitHub Issue**: #3
 - **Status**: completed
 - **Merged in**: 5ae4dd8 (main)
 - **Scope**:

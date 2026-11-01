@@ -132,6 +132,7 @@
   - `feat:` 新功能
   - `refactor:` 非功能改动
   - `test:` 测试相关
+  - **Issue 关联**：若存在对应 Issue/Ticket，Commit 必须附带 Issue 编号（如 `feat(core): ... (resolves #1)` 或 `fix: ... (#2)`），确保改动在远端 GitHub 具备完整追溯链。
 - **禁止**：
   - 私自 `git push`
   - 私自 `git reset --hard`
