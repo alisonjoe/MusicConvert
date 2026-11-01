@@ -7,6 +7,9 @@
 
 set -uo pipefail
 
+GO_TOOLCHAIN_BIN="$(find ~/go/pkg/mod/golang.org/toolchain* -name bin 2>/dev/null | sort -V | tail -1 || true)"
+export PATH="/opt/homebrew/bin:$HOME/.cargo/bin:$HOME/go/bin:${GO_TOOLCHAIN_BIN:-}:$PATH"
+
 REPO="."
 BRANCH=""
 
@@ -106,15 +109,14 @@ run_check "1. Forbidden Zone Scan" check_forbidden_zones
 
 # 2. Build & Test
 check_build_and_test() {
+  local ret=0
   if [[ -f "go.mod" ]]; then
-    go build ./... && go vet ./... && go test ./... -timeout 120s
-  elif [[ -f "package.json" ]]; then
-    if grep -q '"test"' package.json; then npm test; fi
-  elif [[ -f "Cargo.toml" ]]; then
-    cargo check && cargo test
-  else
-    return 0
+    go build ./... && go vet ./... && go test ./... -timeout 120s || ret=1
   fi
+  if [[ -f "Cargo.toml" ]]; then
+    cargo check --workspace && cargo test --workspace || ret=1
+  fi
+  return $ret
 }
 
 run_check "2. Build & Test" check_build_and_test
