@@ -17,7 +17,11 @@ tokio.workspace = true
 clap.workspace = true
 notify.workspace = true
 notify-debouncer-mini.workspace = true
+walkdir.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 tracing-appender.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+tempfile = "3.17"

@@ -1009,6 +1009,8 @@ version = "0.1.0"
 dependencies = [
  "music-core",
  "regex",
+ "serde",
+ "serde_json",
  "tempfile",
  "thiserror",
  "tokio",
@@ -1025,11 +1027,13 @@ dependencies = [
  "music-provider",
  "notify",
  "notify-debouncer-mini",
+ "tempfile",
  "thiserror",
  "tokio",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "walkdir",
 ]
 
 [[package]]
