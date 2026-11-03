@@ -105,7 +105,29 @@ check_forbidden_zones() {
   return 0
 }
 
+# 2. Door Type Risk Classification (Fixing the PR Bottleneck)
+check_door_classification() {
+  local changed
+  changed=$(git diff --name-only "$BASE...$BRANCH" 2>/dev/null || git diff --name-only "$BASE" "$BRANCH")
+  local is_one_way=0
+
+  # Scan for irreversible changes
+  if echo "$changed" | grep -qE "(models/|schema|migrations/|\.proto$|proto/|auth/|security/)"; then
+    is_one_way=1
+  fi
+
+  if [[ $is_one_way -eq 1 ]]; then
+    echo "  🚨 [ONE-WAY DOOR] High-risk / irreversible changes detected (Schema, Auth, or Protobuf)."
+    echo "     Requires human review sign-off before merge."
+  else
+    echo "  🚪 [TWO-WAY DOOR] Low-risk / reversible changes detected."
+    echo "     Eligible for automated merge once tests and standards pass."
+  fi
+  return 0
+}
+
 run_check "1. Forbidden Zone Scan" check_forbidden_zones
+run_check "2. Door Type Risk Classification" check_door_classification
 
 # 2. Build & Test
 check_build_and_test() {
@@ -115,6 +137,9 @@ check_build_and_test() {
   fi
   if [[ -f "Cargo.toml" ]]; then
     cargo check --workspace && cargo test --workspace || ret=1
+  fi
+  if [[ -f "package.json" ]]; then
+    if grep -q '"test"' package.json; then npm test || ret=1; fi
   fi
   return $ret
 }

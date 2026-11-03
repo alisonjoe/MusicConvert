@@ -29,3 +29,21 @@ tools:
 - 服务监听端口与外部访问端点分配
 - 核心上下游依赖与外部第三方集成
 - 核心安全禁区与操作限制守则
+
+## 工位交接契约（Handoff Contract）
+在执行具体任务勘探时，必须在当前工作树根目录输出 `HANDOFF_EXPLORER.md`，供下游 Coder 直接消费：
+```markdown
+# Handoff: Explorer -> Coder
+
+- **任务简述**: <Task Summary>
+- **受影响文件与模块**:
+  - `path/to/target1.go` (新增/修改)
+  - `path/to/target2.go` (依赖调用)
+- **安全禁区核验 (Forbidden Zones)**:
+  - 触发情况: 无 / 触碰 [schema] 并已获审批
+- **依赖拓扑与边界约束**:
+  - 只能调用 `pkg/x`，禁止直接引用 `pkg/y`
+- **建议测试切面 (Verification Angles)**:
+  - 核心单测: 测试用例边界与异常分支
+  - 集成用例: `tests/TC-XXX.md`
+```
