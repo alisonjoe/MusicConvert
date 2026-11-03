@@ -199,9 +199,52 @@ pwsh .\Invoke-Build.ps1 cleanup -Worktree <name> -Force
    - 将成果文档同步到企业知识库（若 agents.config.yaml 有配置）。
 ```
 
+
 ---
 
-## 8. 智能体行为红线（安全护栏）
+## 9. 智能体自治编排协议（Orchestrator Protocol）
+
+在从单步指令（Conductor）跃迁至流水线编排（Orchestrator）体系中，主智能体充当**编排调度中枢**，子智能体（`explorer`, `coder`, `reviewer`）通过标准化的结构化交接文件（Handoff Artifacts）实现无缝信息传递与状态自愈：
+
+```
+                ┌──────────────────────────────────────┐
+                │        Orchestrator (主调度中枢)       │
+                └──────────────────┬───────────────────┘
+                                   │
+              1. 调度派发          │ 5. 自愈驱动 / 最终验收
+          (./Invoke-Build.sh       │ (最多重试 3 次，
+             orchestrate)          │  全绿后交付人类)
+                                   ▼
+┌──────────────────────────────────┴──────────────────────────────────┐
+│                      Worktree 隔离执行流水线                         │
+│                                                                     │
+│  [Explorer 工位] ──HANDOFF_EXPLORER.md──> [Coder 实施与自测]        │
+│                                                   │                 │
+│                                            HANDOFF_CODER.md         │
+│                                                   ▼                 │
+│  [合流交付 / 汇报] <─── AUDIT_REPORT.md (PASS) ─── [Reviewer 门禁]   │
+│                                  │                                  │
+│                                  └─── (BLOCK / FAIL 自动打回重做) ───┘
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 9.1 工位交接协议契约（Handoff Contracts）
+每个工位必须在工作树根目录输出确定的交付工件，严禁口头模糊交接：
+1. **Explorer 交付物（`HANDOFF_EXPLORER.md`）**：
+   - 包含：影响文件清单（Target Files）、架构拓扑影响、安全禁区核验结果（Forbidden Zones Check）、推荐测试策略。
+2. **Coder 交付物（`HANDOFF_CODER.md`）**：
+   - 包含：精准修改文件清单、TDD 红绿单测证据、L2 `verify` 执行输出日志。
+3. **Reviewer 交付物（`AUDIT_REPORT.md`）**：
+   - 包含：结论判定（`PASS` / `BLOCK` / `CAUTION`）、安全与架构合规项、未通过时具体可执行的整改建议（Actionable Feedback）。
+
+### 9.2 自愈反馈环路（Self-Healing Retry Loop）
+- 当 L2 `verify` 失败或 Reviewer 给出 `BLOCK` 时，Orchestrator **禁止直接放弃或转交人类**。
+- Orchestrator 提取具体失败日志与审计意见，重新派发给 Coder 进行自愈修复（默认上限 3 轮）。
+- 只有经过 3 轮自愈仍无法全绿，或触发核心禁区授权请求时，才向人类发起挂起求助。
+
+---
+
+## 10. 智能体行为红线（安全护栏）
 
 ### 必须严格执行（ALWAYS）
 - ✅ 开始行动前，必须先阅读 `agents.config.yaml` 与 `AGENTS.md`。
@@ -211,8 +254,10 @@ pwsh .\Invoke-Build.ps1 cleanup -Worktree <name> -Force
 - ✅ 修改代码前必须查阅 `docs/CODEMAP.md` 评估影响面。
 - ✅ 编写业务代码前，必须预先落盘测试用例规约（`TC-XXX.md`）。
 - ✅ 对核心业务逻辑和状态机落实测试驱动开发（TDD）。
-- ✅ 遇错执行科学排查（假说检验法），拒绝盲目尝试。
+- ✅ 子智能体协同严格遵循 `HANDOFF_*.md` 结构化交接契约。
+- ✅ 遇错执行科学排查（假说检验法），优先触发编排自愈循环。
 - ✅ 必须通过双轨校验（L2+L3）全绿后，方可声明任务完成。
+- ✅ 任务合并完成后，必须自动执行工单状态闭环（本地 ticket 文件标记 completed 并打勾 [x]；若接入 GitHub/GitLab 则联动关闭对应 issue）。
 - ✅ 任务完成后，使用 `Invoke-Build cleanup` 安全回收工作树。
 
 ### 严厉禁止的行为（NEVER）
@@ -222,5 +267,6 @@ pwsh .\Invoke-Build.ps1 cleanup -Worktree <name> -Force
 - ❌ 直接在 `master`、`main` 或任何受保护的发布分支上直接做改动。
 - ❌ 未经用户明确授权和附带豁免标签私自修改核心安全禁区。
 - ❌ 面对 Bug 缺乏证据链，凭空瞎猜乱试代码。
+- ❌ 在缺少测试证据和 Handoff 契约的情况下私自流转或声称“完成”。
 - ❌ 自动执行 `git merge`、`git push` 或删除未经核验的分支。
 - ❌ 在单元测试未跑通、构建未全绿的情况下声称“任务完成”。

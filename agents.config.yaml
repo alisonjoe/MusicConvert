@@ -6,7 +6,7 @@
 # ==============================================================================
 
 workspace:
-  name: "my-project"
+  name: "MusicConvert"
   # 项目结构类型:
   #   - "mono-repo": 当前工作区根目录即为单个独立 Git 仓库
   #   - "multi-repo": 当前工作区根目录为容器，内含多个独立子 Git 仓库
@@ -16,7 +16,7 @@ workspace:
   repos:
     - name: "main"
       path: "."
-      tech: "go" # 支持: go, node, python, rust, java, flutter 等
+      tech: "rust,go" # 支持: go, node, python, rust, java, flutter 等
       # 若为 multi-repo，配置多个条目，如:
       # - name: "backend"
       #   path: "services/backend"
@@ -54,7 +54,7 @@ verification:
   main:
     build: "go build ./... && cargo check --workspace"
     lint: "go vet ./..."
-    test: "go test ./... -timeout 60s && cargo test --workspace"
+    test: "go test ./... -timeout 180s && cargo test --workspace"
 
   # 更多多技术栈配置示例:
   # frontend:

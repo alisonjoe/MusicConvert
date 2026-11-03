@@ -26,12 +26,19 @@ WORKSPACE="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # 1. Resolve repo
 if [[ -z "$REPO" ]]; then
-  if [[ -d "$WORKSPACE/.git" ]]; then
-    REPO="."
+  GIT_TOPLEVEL=$(git rev-parse --show-toplevel 2>/dev/null || true)
+  if [[ -n "$GIT_TOPLEVEL" ]]; then
+    REPO="$GIT_TOPLEVEL"
+  elif [[ -d "$WORKSPACE/.git" ]]; then
+    REPO="$WORKSPACE"
   else
-    mapfile -t REPOS < <(find "$WORKSPACE" -mindepth 1 -maxdepth 1 -type d -exec test -e "{}/.git" ';' -print -prune)
+    REPOS=()
+    while IFS= read -r r; do
+      [[ -n "$r" ]] && REPOS+=("$r")
+    done < <(find "$WORKSPACE" -mindepth 1 -maxdepth 1 -type d -exec test -e "{}/.git" ';' -print -prune 2>/dev/null || true)
+
     if [[ ${#REPOS[@]} -eq 1 ]]; then
-      REPO="$(basename "${REPOS[0]}")"
+      REPO="${REPOS[0]}"
     elif [[ ${#REPOS[@]} -gt 1 ]]; then
       echo "❌ Multiple repositories detected. Please specify --repo <name>:"
       for r in "${REPOS[@]}"; do echo "   - $(basename "$r")"; done
@@ -43,8 +50,8 @@ if [[ -z "$REPO" ]]; then
   fi
 fi
 
-REPO_PATH="$WORKSPACE"
-[[ "$REPO" != "." ]] && REPO_PATH="$WORKSPACE/$REPO"
+REPO_PATH="$REPO"
+[[ "$REPO" == "." ]] && REPO_PATH="$WORKSPACE"
 
 if [[ ! -d "$REPO_PATH" ]]; then
   echo "❌ Repository path does not exist: $REPO_PATH"
