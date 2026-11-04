@@ -1,17 +1,20 @@
-pub mod command;
-pub mod converter;
 pub mod cue;
+pub mod drivers;
 pub mod error;
-pub mod ffprobe;
-pub mod metaflac;
-pub mod missing_tracks;
-pub mod path_resolver;
+pub mod policy;
 
-pub use command::run_command;
-pub use converter::{convert_single_track, split_cue_track};
-pub use cue::{parse_cue_content, parse_cue_file, CueSheet, CueTrack};
+// 历史模块兼容映射
+pub use cue as cue_parser;
+pub use drivers as command_drivers;
+pub use drivers::cli as command;
+pub use drivers::ffmpeg as converter;
+pub use drivers::ffprobe;
+pub use drivers::metaflac;
+pub use policy::missing_tracks;
+pub use policy::path_resolver;
+
+// 顶层平滑导出
+pub use cue::*;
+pub use drivers::*;
 pub use error::AudioError;
-pub use ffprobe::{probe_metadata, FfprobeFormat, FfprobeOutput};
-pub use metaflac::apply_flac_tags;
-pub use missing_tracks::sync_missing_tracks;
-pub use path_resolver::{build_track_filename, resolve_album_output_dir, resolve_disc_output_dir};
+pub use policy::*;

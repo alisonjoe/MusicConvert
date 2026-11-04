@@ -26,10 +26,10 @@ graph TD
 
 | Path | Module Name | Language / Framework | Description |
 | :--- | :--- | :--- | :--- |
-| `crates/music-core/` | Core Domain & DB | Rust / Cargo | 核心领域模型、配置解析、SQLite 持久化、中文简繁/标点/路径清洗 |
-| `crates/music-provider/` | Metadata Provider Chain | Rust / Cargo | 异步元数据责任链 (MusicBrainz, NetEase, iTunes, etc.)，中文本地化保护 |
-| `crates/music-audio/` | Audio Pipeline Engine | Rust / Cargo | 异步 ffmpeg/metaflac 调用、纯 Rust CUE 解析、多碟路径与 missing_tracks 管理 |
-| `crates/music-convert/` | Daemon & CLI Entry | Rust / Cargo | CLI 命令行入口、ReleaseBatch 目录扫描聚合、notify 文件监听守护进程 |
+| `crates/music-core/` | Core Domain & Storage | Rust / Cargo | 核心领域模型 (`model.rs`)、配置解析 (`config.rs`)、SQLite 存储 (`db.rs`) 与文本治理 (`text/` 繁简/路径规范化) |
+| `crates/music-provider/` | Metadata Provider Chain | Rust / Cargo | 异步元数据责任链：`core/` (契约接口与责任链)、`clients/` (MusicBrainz, NetEase, iTunes) 与 `rules/` (中文与古典乐清洗) |
+| `crates/music-audio/` | Audio Pipeline Engine | Rust / Cargo | 音频编解码分轨：`drivers/` (ffmpeg, ffprobe, metaflac)、`cue/` (纯 Rust CUE 解析) 与 `policy/` (多碟路径拓扑与缺失曲目追踪) |
+| `crates/music-convert/` | Daemon & CLI Entry | Rust / Cargo | 应用程序总控：`app/` (命令行 clap)、`monitor/` (ReleaseBatch 聚类扫描与 notify 监听) 与 `engine/` (转码编排调度中枢) |
 | `api/` | Metadata APIs (Go) | Go | 原 Go 版外部音乐元数据服务交互 |
 | `audio/` | Audio Processor (Go) | Go | 原 Go 版音频转码与 CUE 处理 |
 | `config/` | Config Manager (Go) | Go / YAML | 原 Go 版配置管理 |
