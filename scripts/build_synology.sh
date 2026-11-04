@@ -1,22 +1,34 @@
 #!/bin/sh
+# ==============================================================================
+# build_synology.sh — MusicConvert Production Binary Build Pipeline (Rust)
+# Builds native release and Linux cross-compiled binaries for Synology NAS.
+# ==============================================================================
 set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT_DIR"
 
-GOCACHE_DIR="${GOCACHE:-/private/tmp/musicconvert-gocache}"
+export PATH="/opt/homebrew/bin:$HOME/.cargo/bin:$PATH"
 
-echo "Building Synology linux/amd64..."
-env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOCACHE="$GOCACHE_DIR" \
-	go build -trimpath -ldflags="-s -w" -o MusicConvert_synology_amd64 .
+echo "══════════════════════════════════════════════════"
+echo "  📦 Building MusicConvert (Rust Release Pipeline)"
+echo "══════════════════════════════════════════════════"
 
-echo "Building Synology linux/arm64..."
-env CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GOCACHE="$GOCACHE_DIR" \
-	go build -trimpath -ldflags="-s -w" -o MusicConvert_synology_arm64 .
+# 1. Build Host Native Release
+echo "▶ 1. Building host native release binary..."
+cargo build --release --bin MusicConvert
+echo "✅ Native binary generated at: target/release/MusicConvert"
 
-echo "Building Synology linux/armv7..."
-env CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 GOCACHE="$GOCACHE_DIR" \
-	go build -trimpath -ldflags="-s -w" -o MusicConvert_synology_armv7 .
+# 2. Linux / Synology Cross-Compilation (if targets or cross available)
+if rustup target list 2>/dev/null | grep -q 'x86_64-unknown-linux-musl (installed)'; then
+    echo "▶ 2. Building Synology static musl binary (x86_64-unknown-linux-musl)..."
+    cargo build --release --target x86_64-unknown-linux-musl --bin MusicConvert
+    cp target/x86_64-unknown-linux-musl/release/MusicConvert MusicConvert_synology_amd64
+    echo "✅ Synology AMD64 binary generated: MusicConvert_synology_amd64"
+elif command -v cross >/dev/null 2>&1; then
+    echo "▶ 2. Cross-compiling for Linux targets via cross..."
+    cross build --release --target x86_64-unknown-linux-musl --bin MusicConvert
+    cp target/x86_64-unknown-linux-musl/release/MusicConvert MusicConvert_synology_amd64
+fi
 
-echo "Done:"
-file MusicConvert_synology_amd64 MusicConvert_synology_arm64 MusicConvert_synology_armv7
+echo "🎉 Build complete."

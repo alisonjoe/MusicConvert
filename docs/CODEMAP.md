@@ -30,13 +30,8 @@ graph TD
 | `crates/music-provider/` | Metadata Provider Chain | Rust / Cargo | 异步元数据责任链：`core/` (契约接口与责任链)、`clients/` (MusicBrainz, NetEase, iTunes) 与 `rules/` (中文与古典乐清洗) |
 | `crates/music-audio/` | Audio Pipeline Engine | Rust / Cargo | 音频编解码分轨：`drivers/` (ffmpeg, ffprobe, metaflac)、`cue/` (纯 Rust CUE 解析) 与 `policy/` (多碟路径拓扑与缺失曲目追踪) |
 | `crates/music-convert/` | Daemon & CLI Entry | Rust / Cargo | 应用程序总控：`app/` (命令行 clap)、`monitor/` (ReleaseBatch 聚类扫描与 notify 监听) 与 `engine/` (转码编排调度中枢) |
-| `api/` | Metadata APIs (Go) | Go | 原 Go 版外部音乐元数据服务交互 |
-| `audio/` | Audio Processor (Go) | Go | 原 Go 版音频转码与 CUE 处理 |
-| `config/` | Config Manager (Go) | Go / YAML | 原 Go 版配置管理 |
-| `db/` | Database (Go) | Go / SQLite | 原 Go 版 SQLite 操作 |
-| `model/` | Data Models (Go) | Go | 原 Go 版核心数据结构 |
-| `util/` | Utilities (Go) | Go | 原 Go 版通用工具库 |
-| `scripts/` | Automation Scripts | Bash / PowerShell | 跨平台自动化调度、门禁自检与构建脚本 |
+| `legacy/go/` | Legacy Archive (Go) | Go / SQLite | 历史 Go 实现完整归档（含原 api/, audio/, config/, db/, model/, util/），作为只读参考与比对资产 |
+| `scripts/` | Automation Scripts | Bash / PowerShell | 跨平台自动化调度、门禁自检与生产构建脚本 (build_synology.sh) |
 
 ---
 

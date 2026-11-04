@@ -1,31 +1,27 @@
 # AGENTS.md
 
 ## 项目说明
-`MusicConvert` 是一个用 Go 写的本地音乐转换守护程序。它会监控源目录，识别新增或已有的音频文件与 CUE 文件，提取元数据，转换为 FLAC/MP3，写入标签，整理输出目录结构，并把已处理记录写入本地 SQLite 数据库。
+`MusicConvert` 是一个专为 NAS（群晖、TrueNAS、unRAID）设计的本地音乐转换与元数据治理引擎。
+**当前项目架构已全面升级为高性能纯 Rust 工作空间（Cargo Workspace）作为主力运行态**；历史 Go 方案已完整归档至 `legacy/go/` 作为只读参考资产。
 
-这个项目主要面向 NAS 部署，尤其是群晖。代码里包含了比较多的元数据归一化逻辑，覆盖中文、英文、古典音乐、CUE 专辑、多碟专辑，以及各种标签混乱的源目录。
+程序会监控源目录，识别新增或已有的音频文件与 CUE 文件，提取并由多源责任链富化元数据，转换为 FLAC/MP3，写入标签，整理多碟输出目录结构，并把已处理记录写入本地 SQLite 数据库。
 
-## 入口文件
-- `main.go`：程序入口，负责配置加载、数据库初始化、文件监控、任务投递，以及 `--rescan`、`--rescan-all`、`--test-spotify` 等命令行参数。
-- `audio/convert.go`：核心转换与元数据决策逻辑。大多数行为修改都应该落在这里。
-- `config/config.go`：YAML 配置解析与配置辅助函数。
-- `db/music.go`：保存已处理源文件的 SQLite 持久化层。
+## 入口与核心模块 (Rust Workspace)
+- `crates/music-convert/src/main.rs`：主程序入口，负责配置加载、SQLite 初始化、ReleaseBatch 扫描聚合、notify 文件监听守护进程及 CLI 命令。
+- `crates/music-convert/src/engine/orchestrator.rs`：核心转换调度编排。
+- `crates/music-core/`：核心领域模型（`TrackMetadata`）、YAML 配置解析、SQLite 持久化（`db.rs`）及文本治理（`text/chinese.rs`, `text/path.rs`）。
+- `crates/music-provider/`：多源异步元数据责任链（`core/` 契约、`clients/` MusicBrainz/NetEase/iTunes 适配器、`rules/` 中文与古典乐保护规则）。
+- `crates/music-audio/`：音频处理引擎（`drivers/` 驱动封装 ffmpeg/metaflac、`cue/` 纯 Rust CUE 解析、`policy/` 多碟拓扑与 missing_tracks 追踪）。
+- `legacy/go/`：历史 Go 完整实现（只读归档）。
 
 ## 数据流
-1. `main.go` 读取 `config.yaml`。
-2. 程序先扫描一次源目录，然后用 `fsnotify` 持续监听。
-3. `util.GetMusicFileInfoForFile` 负责把音频文件和匹配的 `.cue` 文件配对。
-4. `audio.ToFLAC` 从队列取任务，分别进入单文件转换或 CUE 转换。
-5. `audio/convert.go` 按大致如下顺序决定元数据来源：
-   - 本地标签和源目录线索
-   - CUE 上下文
-   - MusicBrainz
-   - 如果启用则使用 Spotify
-   - 网易云 / OpenAPI / 旧接口回退
-   - iTunes 做专辑级补充
-   - 配了 token 时，对古典专辑再尝试 Discogs
-6. 输出文件写入 `output_root` 下，按歌手和专辑分层，多碟专辑再加 `CD1`、`CD2` 之类的目录。
-7. 成功处理后会写入 `musicConvert.db`，避免同一源文件重复转换。
+1. 程序启动读取 `config.yaml`。
+2. 扫描源目录，通过 `ReleaseBatch` 将同专辑各碟（CD1/CD2/Catalog 目录）聚类合并，并通过 `notify` 持续监听。
+3. `music-provider` 按责任链顺序决定元数据来源：本地标签 -> CUE 上下文 -> MusicBrainz -> 网易云 (OpenAPI/Cookie) -> iTunes。
+4. 严格执行中文保护规则：本地已有中文时不用外网英文覆盖；古典音乐规约 Op./No. 与作品编号。
+5. `music-audio` 执行高精度分轨或转码，并由 `metaflac` 注入标准标签。
+6. 写入 `output_root` 下，多碟专辑自动规范化为 `CD1`、`CD2` 等目录。
+7. 处理成功后写入本地 SQLite，避免重复转换。
 
 ## 关键文件
 - `audio/convert.go`：规范化元数据、构建输出路径、处理碟号、年份、古典音乐、缺失曲目报告和标签写入。

@@ -16,7 +16,7 @@ workspace:
   repos:
     - name: "main"
       path: "."
-      tech: "rust,go" # 支持: go, node, python, rust, java, flutter 等
+      tech: "rust" # 支持: go, node, python, rust, java, flutter 等
       # 若为 multi-repo，配置多个条目，如:
       # - name: "backend"
       #   path: "services/backend"
@@ -52,9 +52,9 @@ security:
 # L2 verify-worktree 与 L3 pre-merge-check 会根据改动目录自动匹配并执行对应指令。
 verification:
   main:
-    build: "go build ./... && cargo check --workspace"
-    lint: "go vet ./..."
-    test: "go test ./... -timeout 180s && cargo test --workspace"
+    build: "cargo check --workspace"
+    lint: "cargo clippy --workspace --all-targets -- -D warnings"
+    test: "cargo test --workspace"
 
   # 更多多技术栈配置示例:
   # frontend:

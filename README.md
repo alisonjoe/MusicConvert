@@ -64,6 +64,7 @@ MusicConvert (Cargo Workspace)
     ├── app/                   # 命令行入口 (clap CLI 解析)
     ├── monitor/               # 监听源 (ReleaseBatch 目录聚类扫描 / notify 异步文件监听)
     └── engine/                # 编排调度总线 (ConvertOrchestrator)
+└── legacy/go                  # 历史 Go 完整实现 (已归档，作为算法比对与只读参考)
 ```
 
 ---
