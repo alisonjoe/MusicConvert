@@ -60,11 +60,13 @@ case "$TARGET" in
     ;;
 
   verify)
+    VERIFY_ARGS=()
+    [[ $FORCE -eq 1 ]] && VERIFY_ARGS+=(--force)
     if [[ "$CALLER_DIR" != "$ROOT" && -z "$REPO" ]]; then
-      "$ROOT/scripts/verify-worktree.sh"
+      "$ROOT/scripts/verify-worktree.sh" "${VERIFY_ARGS[@]}"
     else
       cd "$ROOT"
-      "$ROOT/scripts/verify-worktree.sh"
+      "$ROOT/scripts/verify-worktree.sh" "${VERIFY_ARGS[@]}"
     fi
     ;;
 
