@@ -1,8 +1,7 @@
 use clap::Parser;
-use music_convert::cli::Cli;
-use music_convert::orchestrator::ConvertOrchestrator;
-use music_convert::scanner::scan_release_batches;
-use music_convert::watcher::watch_directory;
+use music_convert::app::Cli;
+use music_convert::engine::ConvertOrchestrator;
+use music_convert::monitor::{scan_release_batches, watch_directory};
 use music_core::{Config, Database};
 use music_provider::ProviderChain;
 use std::fs::create_dir_all;

@@ -1,9 +1,14 @@
-pub mod cli;
-pub mod orchestrator;
-pub mod scanner;
-pub mod watcher;
+pub mod app;
+pub mod engine;
+pub mod monitor;
 
-pub use cli::Cli;
-pub use orchestrator::ConvertOrchestrator;
-pub use scanner::scan_release_batches;
-pub use watcher::watch_directory;
+// 历史模块兼容映射
+pub use app::cli;
+pub use engine::orchestrator;
+pub use monitor::{scanner, watcher};
+
+// 顶层导出
+pub use app::cli::Cli;
+pub use engine::orchestrator::ConvertOrchestrator;
+pub use monitor::scanner::scan_release_batches;
+pub use monitor::watcher::watch_directory;

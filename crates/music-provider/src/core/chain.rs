@@ -1,10 +1,10 @@
-use crate::error::ProviderError;
-use crate::itunes::ITunesProvider;
-use crate::localization::localize_metadata;
-use crate::musicbrainz::MusicBrainzProvider;
-use crate::netease::NeteaseProvider;
-use crate::query::MetadataQuery;
-use crate::trait_provider::MetadataProvider;
+use crate::clients::itunes::ITunesProvider;
+use crate::clients::musicbrainz::MusicBrainzProvider;
+use crate::clients::netease::NeteaseProvider;
+use crate::core::error::ProviderError;
+use crate::core::query::MetadataQuery;
+use crate::core::traits::MetadataProvider;
+use crate::rules::localization::localize_metadata;
 use music_core::{Config, ReleaseMetadata};
 use std::sync::Arc;
 use tracing::{debug, info, warn};

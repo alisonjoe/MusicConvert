@@ -1,17 +1,8 @@
-pub mod chain;
-pub mod error;
-pub mod itunes;
-pub mod localization;
-pub mod musicbrainz;
-pub mod netease;
-pub mod query;
-pub mod trait_provider;
+pub mod clients;
+pub mod core;
+pub mod rules;
 
-pub use chain::ProviderChain;
-pub use error::ProviderError;
-pub use itunes::ITunesProvider;
-pub use localization::localize_metadata;
-pub use musicbrainz::MusicBrainzProvider;
-pub use netease::NeteaseProvider;
-pub use query::MetadataQuery;
-pub use trait_provider::MetadataProvider;
+// 保持对外平滑兼容旧 API 导入路径
+pub use clients::*;
+pub use core::*;
+pub use rules::*;

@@ -1,4 +1,4 @@
-use crate::command::run_command;
+use super::cli::run_command;
 use crate::error::AudioError;
 use serde::Deserialize;
 use std::collections::HashMap;

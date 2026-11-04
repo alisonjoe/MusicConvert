@@ -47,10 +47,23 @@
 
 ```
 MusicConvert (Cargo Workspace)
-├── crates/music-core          # 领域实体模型、YAML 配置、SQLite 持久化、OpenCC 繁简转换、跨平台路径清洗
-├── crates/music-provider      # 异步元数据责任链 (MusicBrainz, NetEase, iTunes) 与中文/古典规范过滤器
-├── crates/music-audio         # 异步 ffmpeg/metaflac 驱动、纯 Rust CUE 解析与分轨、missing_tracks 状态机
-└── crates/music-convert       # CLI 启动入口 (clap)、ReleaseBatch 聚类扫描、异步文件监听与日志轮转
+├── crates/music-core          # 核心领域模型与基础库
+│   ├── config.rs              # YAML 配置反序列化
+│   ├── db.rs                  # SQLite 幂等去重持久化
+│   ├── model.rs               # TrackMetadata, ReleaseMetadata 领域实体
+│   └── text/                  # 文本治理 (chinese 繁简转换 / path 规范化)
+├── crates/music-provider      # 异步多源元数据引擎
+│   ├── core/                  # 内核契约 (MetadataProvider trait, ProviderChain, query)
+│   ├── clients/               # 外部服务适配器 (MusicBrainz, NetEase, iTunes)
+│   └── rules/                 # 元数据清洗与中文/古典保护规则 (localization)
+├── crates/music-audio         # 音频编解码与分轨流水线
+│   ├── drivers/               # 外部 CLI 驱动 (ffmpeg, ffprobe, metaflac, async cli runner)
+│   ├── cue/                   # 纯 Rust CUE 解析与时间戳计算引擎 (parser)
+│   └── policy/                # 治理策略 (missing_tracks 审计 / path_resolver 多碟拓扑)
+└── crates/music-convert       # 守护进程与应用程序调度
+    ├── app/                   # 命令行入口 (clap CLI 解析)
+    ├── monitor/               # 监听源 (ReleaseBatch 目录聚类扫描 / notify 异步文件监听)
+    └── engine/                # 编排调度总线 (ConvertOrchestrator)
 ```
 
 ---

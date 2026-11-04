@@ -1,6 +1,6 @@
-use crate::error::ProviderError;
-use crate::query::MetadataQuery;
-use crate::trait_provider::MetadataProvider;
+use crate::core::error::ProviderError;
+use crate::core::query::MetadataQuery;
+use crate::core::traits::MetadataProvider;
 use async_trait::async_trait;
 use music_core::{ReleaseMetadata, TrackMetadata};
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, USER_AGENT};

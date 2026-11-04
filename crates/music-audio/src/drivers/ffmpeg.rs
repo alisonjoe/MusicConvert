@@ -1,6 +1,6 @@
-use crate::command::run_command;
+use super::cli::run_command;
+use super::metaflac::apply_flac_tags;
 use crate::error::AudioError;
-use crate::metaflac::apply_flac_tags;
 use music_core::TrackMetadata;
 use std::path::Path;
 
