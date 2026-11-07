@@ -14,6 +14,9 @@ music-core.workspace = true
 music-provider.workspace = true
 music-audio.workspace = true
 tokio.workspace = true
+axum.workspace = true
+tower-http.workspace = true
+tokio-stream.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 chrono.workspace = true
@@ -28,3 +31,4 @@ thiserror.workspace = true
 
 [dev-dependencies]
 tempfile = "3.17"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }

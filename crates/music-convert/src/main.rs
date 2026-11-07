@@ -7,7 +7,7 @@ use music_provider::ProviderChain;
 use std::fs::create_dir_all;
 use std::path::Path;
 use std::sync::Arc;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 use tracing_appender::rolling;
 use tracing_subscriber::fmt;
 use tracing_subscriber::layer::SubscriberExt;
@@ -111,6 +111,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 });
             });
         });
+    }
+
+    // 8. Start HTTP REST & SSE API server if requested
+    if let Some(addr_str) = &cli.server {
+        match addr_str.parse::<std::net::SocketAddr>() {
+            Ok(addr) => {
+                let state = music_convert::server::AppState::new(
+                    orchestrator.registry.clone(),
+                    Arc::new(config.clone()),
+                );
+                tokio::spawn(async move {
+                    if let Err(e) = music_convert::server::start_server(state, addr).await {
+                        error!("[Server] Failed to run HTTP server: {}", e);
+                    }
+                });
+            }
+            Err(e) => {
+                error!("[Server] Invalid address '{}': {}", addr_str, e);
+            }
+        }
     }
 
     info!("MusicConvert daemon running. Press Ctrl+C to terminate.");
