@@ -10,7 +10,7 @@ use tokio::net::TcpListener;
 use tokio::sync::RwLock;
 
 async fn spawn_test_server(registry: Arc<RwLock<TaskRegistry>>) -> (SocketAddr, tokio::task::JoinHandle<()>) {
-    let state = AppState::new(registry, Arc::new(Config::default()));
+    let state = AppState::with_defaults(registry, Arc::new(Config::default()));
     let app = create_router(state);
 
     let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind port");

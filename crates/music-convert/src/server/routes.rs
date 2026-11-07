@@ -1,6 +1,7 @@
 use crate::server::assets::static_handler;
 use crate::server::handlers::{
-    approve_task, cancel_task, events_sse, get_task, health_check, list_tasks,
+    approve_task, browse_fs, cancel_task, events_sse, get_config, get_task, health_check,
+    list_converted, list_tasks, reconvert_music, trigger_scan, update_src_path,
 };
 use crate::server::state::AppState;
 use axum::{
@@ -17,6 +18,12 @@ pub fn create_router(state: AppState) -> Router {
 
     Router::new()
         .route("/api/health", get(health_check))
+        .route("/api/config", get(get_config))
+        .route("/api/config/src-path", post(update_src_path))
+        .route("/api/fs/browse", get(browse_fs))
+        .route("/api/converted", get(list_converted))
+        .route("/api/converted/reconvert", post(reconvert_music))
+        .route("/api/scan", post(trigger_scan))
         .route("/api/tasks", get(list_tasks))
         .route("/api/tasks/{id}", get(get_task))
         .route("/api/tasks/{id}/approve", post(approve_task))
