@@ -927,6 +927,15 @@
 
       const es = new EventSource('/api/events');
 
+      function unpack(e) {
+        try {
+          const raw = JSON.parse(e.data);
+          return (raw && raw.data !== undefined) ? raw.data : raw;
+        } catch (err) {
+          return null;
+        }
+      }
+
       es.onopen = () => {
         statusBadge.className = 'status-badge';
         statusText.textContent = 'SSE 实时链路已连接';
@@ -938,7 +947,8 @@
       };
 
       es.addEventListener('TaskDiscovered', (e) => {
-        const task = JSON.parse(e.data);
+        const task = unpack(e);
+        if (!task || !task.task_id) return;
         const idx = activeTasks.findIndex(t => t.task_id === task.task_id);
         if (idx >= 0) activeTasks[idx] = task;
         else activeTasks.unshift(task);
@@ -946,56 +956,70 @@
       });
 
       es.addEventListener('TaskStatusChanged', (e) => {
-        const payload = JSON.parse(e.data);
-        const task = activeTasks.find(t => t.task_id === payload.task_id);
+        const d = unpack(e);
+        if (!d || !d.task_id) return;
+        const task = activeTasks.find(t => t.task_id === d.task_id);
         if (task) {
-          task.status = payload.status;
+          task.status = d.status;
           renderAll();
         }
       });
 
       es.addEventListener('TaskAwaitingReview', (e) => {
-        const payload = JSON.parse(e.data);
-        const idx = activeTasks.findIndex(t => t.task_id === payload.task_id);
-        if (idx >= 0) activeTasks[idx] = payload.task;
-        else activeTasks.unshift(payload.task);
+        const d = unpack(e);
+        if (!d || !d.task_id) return;
+        const idx = activeTasks.findIndex(t => t.task_id === d.task_id);
+        const taskObj = d.task || d;
+        if (idx >= 0) activeTasks[idx] = taskObj;
+        else activeTasks.unshift(taskObj);
         renderAll();
       });
 
       es.addEventListener('TrackProgressUpdated', (e) => {
-        const payload = JSON.parse(e.data);
-        const task = activeTasks.find(t => t.task_id === payload.task_id);
+        const d = unpack(e);
+        if (!d || !d.task_id) return;
+        const task = activeTasks.find(t => t.task_id === d.task_id);
         if (task && task.tracks) {
-          const track = task.tracks.find(tr => tr.track_number === payload.track_number);
+          const track = task.tracks.find(tr => tr.track_number === d.track_number);
           if (track) {
-            track.progress_percent = payload.progress_percent;
-            track.status = payload.status;
+            track.progress_percent = d.progress_percent;
+            track.status = d.status;
             renderAll();
           }
         }
       });
 
       es.addEventListener('TaskCompleted', (e) => {
-        const payload = JSON.parse(e.data);
-        const idx = activeTasks.findIndex(t => t.task_id === payload.task_id);
-        if (idx >= 0) {
-          const [completed] = activeTasks.splice(idx, 1);
-          completed.status = { type: 'Completed' };
-          historyTasks.unshift(completed);
-          if (historyTasks.length > 50) historyTasks.pop();
-          renderAll();
+        const d = unpack(e);
+        const taskId = d ? (d.task_id || d) : null;
+        if (taskId) {
+          const idx = activeTasks.findIndex(t => t.task_id === taskId);
+          if (idx >= 0) {
+            const [completed] = activeTasks.splice(idx, 1);
+            completed.status = { type: 'Completed' };
+            historyTasks = historyTasks.filter(item => item.release_path !== completed.release_path);
+            historyTasks.unshift(completed);
+            if (historyTasks.length > 50) historyTasks.pop();
+            renderAll();
+          }
         }
+        fetchTasks();
       });
 
       es.addEventListener('TaskFailed', (e) => {
-        const payload = JSON.parse(e.data);
-        const idx = activeTasks.findIndex(t => t.task_id === payload.task_id);
-        if (idx >= 0) {
-          const [failed] = activeTasks.splice(idx, 1);
-          failed.status = { type: 'Failed', detail: { error: payload.error } };
-          historyTasks.unshift(failed);
-          renderAll();
+        const d = unpack(e);
+        const taskId = d ? (d.task_id || d) : null;
+        if (taskId) {
+          const idx = activeTasks.findIndex(t => t.task_id === taskId);
+          if (idx >= 0) {
+            const [failed] = activeTasks.splice(idx, 1);
+            failed.status = { type: 'Failed', detail: { error: d.error } };
+            historyTasks = historyTasks.filter(item => item.release_path !== failed.release_path);
+            historyTasks.unshift(failed);
+            renderAll();
+          }
         }
+        fetchTasks();
       });
     }
 
@@ -1003,7 +1027,18 @@
       const awaitingList = activeTasks.filter(t => t.status && (t.status === 'AwaitingReview' || t.status.type === 'AwaitingReview'));
       document.getElementById('activeCount').textContent = activeTasks.length;
       document.getElementById('reviewCount').textContent = awaitingList.length;
-      document.getElementById('historyCount').textContent = historyTasks.length;
+
+      // Deduplicate history tasks by release_path, keeping the newest
+      const seenPaths = new Set();
+      const dedupedHistory = [];
+      for (const t of historyTasks) {
+        const key = t.release_path || (t.artist + '||' + t.album);
+        if (!seenPaths.has(key)) {
+          seenPaths.add(key);
+          dedupedHistory.push(t);
+        }
+      }
+      document.getElementById('historyCount').textContent = dedupedHistory.length;
 
       const reviewSection = document.getElementById('reviewSection');
       const reviewList = document.getElementById('reviewList');
@@ -1034,10 +1069,10 @@
       }
 
       const historyContainer = document.getElementById('historyList');
-      if (historyTasks.length === 0) {
+      if (dedupedHistory.length === 0) {
         historyContainer.innerHTML = '<div class="empty-placeholder">暂无历史转换记录</div>';
       } else {
-        historyContainer.innerHTML = historyTasks.map(t => renderTaskCard(t, true)).join('');
+        historyContainer.innerHTML = dedupedHistory.map(t => renderTaskCard(t, true)).join('');
       }
     }
 
@@ -1159,6 +1194,7 @@
     fetchConfig();
     fetchTasks();
     initSSE();
+    setInterval(fetchTasks, 3000);
   </script>
 </body>
 </html>

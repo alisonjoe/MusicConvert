@@ -96,15 +96,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     if !config.src_path.is_empty() {
         let src_path = config.src_path.clone();
         let orch = orchestrator.clone();
+        let is_scanning = Arc::new(tokio::sync::Mutex::new(()));
 
         tokio::task::spawn_blocking(move || {
             let watch_path = src_path.clone();
             watch_directory(Path::new(&watch_path), move |paths| {
                 info!("[Watcher] Detected {} changed paths", paths.len());
-                let batches = scan_release_batches(Path::new(&src_path));
                 let rt = tokio::runtime::Handle::current();
                 let o = orch.clone();
+                let p = src_path.clone();
+                let scanning_lock = is_scanning.clone();
                 rt.spawn(async move {
+                    let Ok(_guard) = scanning_lock.try_lock() else {
+                        info!("[Watcher] Scan already in progress, skipping overlapping trigger");
+                        return;
+                    };
+                    let batches = scan_release_batches(Path::new(&p));
                     for b in batches {
                         o.process_batch(&b).await;
                     }

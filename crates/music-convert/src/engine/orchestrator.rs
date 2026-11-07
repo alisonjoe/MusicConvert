@@ -9,16 +9,30 @@ use music_core::{Config, Database, MusicFileInfo, ReleaseBatch, TrackMetadata};
 use music_provider::{MetadataQuery, ProviderChain};
 use std::collections::HashSet;
 use std::fs;
-use std::path::Path;
-use std::sync::Arc;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use tokio::sync::RwLock;
 use tracing::{error, info, warn};
+
+struct InFlightGuard {
+    in_flight: Arc<Mutex<HashSet<PathBuf>>>,
+    path: PathBuf,
+}
+
+impl Drop for InFlightGuard {
+    fn drop(&mut self) {
+        if let Ok(mut set) = self.in_flight.lock() {
+            set.remove(&self.path);
+        }
+    }
+}
 
 pub struct ConvertOrchestrator {
     pub config: Config,
     pub db: Arc<Database>,
     pub provider_chain: Arc<ProviderChain>,
     pub registry: Arc<RwLock<TaskRegistry>>,
+    pub in_flight: Arc<Mutex<HashSet<PathBuf>>>,
 }
 
 impl ConvertOrchestrator {
@@ -42,10 +56,32 @@ impl ConvertOrchestrator {
             db,
             provider_chain,
             registry,
+            in_flight: Arc::new(Mutex::new(HashSet::new())),
         }
     }
 
     pub async fn process_batch(&self, batch: &ReleaseBatch) {
+        let release_context = batch.release_context.clone();
+
+        // Concurrency deduplication: ensure single in-flight task per release batch
+        let _guard = {
+            let mut guard = match self.in_flight.lock() {
+                Ok(g) => g,
+                Err(p) => p.into_inner(),
+            };
+            if !guard.insert(release_context.clone()) {
+                info!(
+                    "[Orchestrator] ReleaseBatch at {:?} is already in-flight! Skipping duplicate processing.",
+                    release_context
+                );
+                return;
+            }
+            InFlightGuard {
+                in_flight: self.in_flight.clone(),
+                path: release_context.clone(),
+            }
+        };
+
         let mut unprocessed_files = Vec::new();
         for file in &batch.files {
             let p = file.file_path.as_ref().or(file.cue_path.as_ref());
