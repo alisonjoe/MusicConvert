@@ -28,9 +28,11 @@ async fn test_tc_009_web_control_api_suite() {
     fs::create_dir_all(src_dir.join("AlbumB")).unwrap();
     fs::write(src_dir.join("ignore_me.txt"), "hello").unwrap();
 
-    let mut config = Config::default();
-    config.src_path = src_dir.to_str().unwrap().to_string();
-    config.output_root = temp_root.path().join("output").to_str().unwrap().to_string();
+    let config = Config {
+        src_path: src_dir.to_str().unwrap().to_string(),
+        output_root: temp_root.path().join("output").to_str().unwrap().to_string(),
+        ..Default::default()
+    };
 
     let db = Arc::new(Database::open_in_memory().unwrap());
     db.insert("/music/artist/song1.flac", 1).unwrap();
