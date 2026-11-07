@@ -12,7 +12,9 @@ pub enum DbError {
     EmptyPrefix,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicInfo {
     pub id: i64,
     pub music: String,
@@ -115,6 +117,70 @@ impl Database {
         let affected = conn.execute("DELETE FROM music_info", [])?;
         Ok(affected)
     }
+
+    pub fn delete_by_music(&self, music: &str) -> Result<usize, DbError> {
+        let conn = self.conn.lock().unwrap();
+        let affected = conn.execute("DELETE FROM music_info WHERE music = ?1", params![music])?;
+        Ok(affected)
+    }
+
+    pub fn count_records(&self, search: Option<&str>) -> Result<usize, DbError> {
+        let conn = self.conn.lock().unwrap();
+        let count: i64 = if let Some(s) = search {
+            let pattern = format!("%{}%", s);
+            conn.query_row(
+                "SELECT COUNT(*) FROM music_info WHERE music LIKE ?1",
+                params![pattern],
+                |row| row.get(0),
+            )?
+        } else {
+            conn.query_row("SELECT COUNT(*) FROM music_info", [], |row| row.get(0))?
+        };
+        Ok(count as usize)
+    }
+
+    pub fn list_records(
+        &self,
+        limit: usize,
+        offset: usize,
+        search: Option<&str>,
+    ) -> Result<Vec<MusicInfo>, DbError> {
+        let conn = self.conn.lock().unwrap();
+        let mut list = Vec::new();
+        if let Some(s) = search {
+            let pattern = format!("%{}%", s);
+            let mut stmt = conn.prepare(
+                "SELECT id, music, state, created FROM music_info WHERE music LIKE ?1 ORDER BY created DESC, id DESC LIMIT ?2 OFFSET ?3",
+            )?;
+            let rows = stmt.query_map(params![pattern, limit as i64, offset as i64], |row| {
+                Ok(MusicInfo {
+                    id: row.get(0)?,
+                    music: row.get(1)?,
+                    state: row.get(2).unwrap_or(0),
+                    created: row.get(3).unwrap_or(0),
+                })
+            })?;
+            for r in rows {
+                list.push(r?);
+            }
+        } else {
+            let mut stmt = conn.prepare(
+                "SELECT id, music, state, created FROM music_info ORDER BY created DESC, id DESC LIMIT ?1 OFFSET ?2",
+            )?;
+            let rows = stmt.query_map(params![limit as i64, offset as i64], |row| {
+                Ok(MusicInfo {
+                    id: row.get(0)?,
+                    music: row.get(1)?,
+                    state: row.get(2).unwrap_or(0),
+                    created: row.get(3).unwrap_or(0),
+                })
+            })?;
+            for r in rows {
+                list.push(r?);
+            }
+        }
+        Ok(list)
+    }
 }
 
 #[cfg(test)]
@@ -143,5 +209,34 @@ mod tests {
         let deleted = db.delete_by_prefix("/music").unwrap();
         assert_eq!(deleted, 2);
         assert!(!db.is_processed("/music/test.flac").unwrap());
+    }
+
+    #[test]
+    fn test_db_list_count_and_delete_by_music() {
+        let db = Database::open_in_memory().unwrap();
+
+        db.insert("/music/artist1/song1.flac", 1).unwrap();
+        db.insert("/music/artist1/song2.flac", 1).unwrap();
+        db.insert("/music/artist2/other.flac", 1).unwrap();
+
+        assert_eq!(db.count_records(None).unwrap(), 3);
+        assert_eq!(db.count_records(Some("song")).unwrap(), 2);
+        assert_eq!(db.count_records(Some("other")).unwrap(), 1);
+        assert_eq!(db.count_records(Some("nonexistent")).unwrap(), 0);
+
+        let page1 = db.list_records(2, 0, None).unwrap();
+        assert_eq!(page1.len(), 2);
+
+        let page2 = db.list_records(2, 2, None).unwrap();
+        assert_eq!(page2.len(), 1);
+
+        let filtered = db.list_records(10, 0, Some("artist2")).unwrap();
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].music, "/music/artist2/other.flac");
+
+        let deleted = db.delete_by_music("/music/artist2/other.flac").unwrap();
+        assert_eq!(deleted, 1);
+        assert_eq!(db.count_records(None).unwrap(), 2);
+        assert!(!db.is_processed("/music/artist2/other.flac").unwrap());
     }
 }
