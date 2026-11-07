@@ -167,6 +167,10 @@ impl TaskRegistry {
             .or_else(|| self.history_buffer.iter().find(|t| t.task_id == task_id).cloned())
     }
 
+    pub fn get_task_mut(&mut self, task_id: &str) -> Option<&mut BatchTask> {
+        self.active_tasks.get_mut(task_id)
+    }
+
     pub fn list_active(&self) -> Vec<BatchTask> {
         let mut list: Vec<BatchTask> = self.active_tasks.values().cloned().collect();
         list.sort_by(|a, b| b.created_at.cmp(&a.created_at));

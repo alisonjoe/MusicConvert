@@ -276,3 +276,44 @@ async fn test_orchestrator_in_flight_batch_dedup() {
         lock.remove(&src_dir);
     }
 }
+
+#[tokio::test]
+async fn test_orchestrator_single_file_track_inference_and_progress() {
+    let tmp = tempdir().expect("tempdir");
+    let src_dir = tmp.path().join("Lady Gaga").join("The Fame (2008)");
+    std::fs::create_dir_all(&src_dir).unwrap();
+
+    // Create a mock single audio file named "Lady Gaga - The Fame - 09 - The Fame.flac"
+    let audio_file = src_dir.join("Lady Gaga - The Fame - 09 - The Fame.flac");
+    std::fs::write(&audio_file, b"fake flac content").unwrap();
+
+    let db_path = tmp.path().join("test.db");
+    let db = Arc::new(Database::open(&db_path).unwrap());
+
+    let mut config = Config::default();
+    config.output_root = tmp.path().join("output").to_string_lossy().to_string();
+
+    let provider = Arc::new(ProviderChain::new());
+    let orch = Arc::new(ConvertOrchestrator::new(config, db, provider));
+
+    let batch = ReleaseBatch {
+        release_context: src_dir.clone(),
+        files: vec![MusicFileInfo {
+            file_path: Some(audio_file),
+            cue_path: None,
+            file_suffix: "flac".to_string(),
+        }],
+    };
+
+    orch.process_batch(&batch).await;
+
+    // Verify registry task
+    let reg = orch.registry.read().await;
+    assert_eq!(reg.history_count(), 1);
+    let task = &reg.list_history()[0];
+    assert_eq!(task.tracks.len(), 1);
+    // Track number must be inferred as 9, NOT 1!
+    assert_eq!(task.tracks[0].track_number, 9);
+    // Title must be parsed as "The Fame", NOT "Lady Gaga - The Fame - 09 - The Fame"!
+    assert_eq!(task.tracks[0].title, "The Fame");
+}

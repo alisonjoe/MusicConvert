@@ -2,8 +2,9 @@ use crate::engine::registry::TaskRegistry;
 use crate::engine::task::{BatchTask, TaskStatus, TrackItem, TrackStatus};
 use chrono::Utc;
 use music_audio::{
-    build_track_filename, convert_single_track, parse_cue_file, probe_metadata,
-    resolve_album_output_dir, resolve_disc_output_dir, split_cue_track, sync_missing_tracks,
+    build_track_filename, convert_single_track, infer_single_track_metadata, parse_cue_file,
+    probe_metadata, resolve_album_output_dir, resolve_disc_output_dir, split_cue_track,
+    sync_missing_tracks, title_matches,
 };
 use music_core::{Config, Database, MusicFileInfo, ReleaseBatch, TrackMetadata};
 use music_provider::{MetadataQuery, ProviderChain};
@@ -164,15 +165,43 @@ impl ConvertOrchestrator {
 
         if initial_tracks.is_empty() {
             for (idx, f) in unprocessed_files.iter().enumerate() {
-                let title = f
+                let (tag_track, tag_title, tag_artist) = if let Some(audio) = &f.file_path {
+                    if let Ok(probe) = probe_metadata(audio).await {
+                        (
+                            probe
+                                .format
+                                .get_tag("track")
+                                .or_else(|| probe.format.get_tag("tracknumber"))
+                                .map(|s| s.to_string()),
+                            probe.format.get_tag("title").map(|s| s.to_string()),
+                            probe.format.get_tag("artist").map(|s| s.to_string()),
+                        )
+                    } else {
+                        (None, None, None)
+                    }
+                } else {
+                    (None, None, None)
+                };
+
+                let fn_stem = f
                     .file_path
                     .as_ref()
                     .and_then(|p| p.file_stem())
                     .and_then(|s| s.to_str())
                     .unwrap_or("Unknown Track");
-                initial_tracks.push(TrackItem::new(
+
+                let inferred = infer_single_track_metadata(
+                    tag_track.as_deref(),
+                    tag_title.as_deref(),
+                    tag_artist.as_deref(),
+                    fn_stem,
                     (idx + 1) as u32,
-                    title,
+                    None,
+                );
+
+                initial_tracks.push(TrackItem::new(
+                    inferred.track_num,
+                    inferred.title,
                     query_artist.clone(),
                 ));
             }
@@ -208,6 +237,23 @@ impl ConvertOrchestrator {
             .map(|m| m.album.clone())
             .unwrap_or_else(|| query_album.clone());
         let mut final_year = online_meta.as_ref().and_then(|m| m.year.clone());
+
+        // Standardize registry task metadata if online meta available
+        if let Some(meta) = &online_meta {
+            let mut reg = self.registry.write().await;
+            if let Some(task) = reg.get_task_mut(&task_id) {
+                task.artist = final_artist.clone();
+                task.album = final_album.clone();
+                for track in &mut task.tracks {
+                    if let Some(m_track) = meta.tracks.iter().find(|t| t.track_number == track.track_number) {
+                        track.title = m_track.title.clone();
+                    } else if let Some(m_track) = meta.tracks.iter().find(|t| title_matches(&track.title, &t.title)) {
+                        track.track_number = m_track.track_number;
+                        track.title = m_track.title.clone();
+                    }
+                }
+            }
+        }
 
         // Confidence calculation
         let confidence = if online_meta.is_some() {
@@ -288,9 +334,10 @@ impl ConvertOrchestrator {
         }
 
         // 3. Convert files
-        for file in &unprocessed_files {
+        for (idx, file) in unprocessed_files.iter().enumerate() {
             self.convert_file_item(
                 &task_id,
+                (idx + 1) as u32,
                 file,
                 &album_out_dir,
                 &final_artist,
@@ -330,6 +377,7 @@ impl ConvertOrchestrator {
     async fn convert_file_item(
         &self,
         task_id: &str,
+        fallback_index: u32,
         item: &MusicFileInfo,
         album_out_dir: &Path,
         artist: &str,
@@ -453,18 +501,44 @@ impl ConvertOrchestrator {
 
         // Case B: Single file conversion
         if let Some(src_audio) = &item.file_path {
-            let track_no = 1;
-            let title = src_audio
+            let (tag_track, tag_title, tag_artist) =
+                if let Ok(probe) = probe_metadata(src_audio).await {
+                    (
+                        probe
+                            .format
+                            .get_tag("track")
+                            .or_else(|| probe.format.get_tag("tracknumber"))
+                            .map(|s| s.to_string()),
+                        probe.format.get_tag("title").map(|s| s.to_string()),
+                        probe.format.get_tag("artist").map(|s| s.to_string()),
+                    )
+                } else {
+                    (None, None, None)
+                };
+
+            let fn_stem = src_audio
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("Track 01");
 
-            let out_filename = build_track_filename(track_no, title, &self.config.desc_type);
+            let inferred = infer_single_track_metadata(
+                tag_track.as_deref(),
+                tag_title.as_deref(),
+                tag_artist.as_deref(),
+                fn_stem,
+                fallback_index,
+                online_meta.as_ref(),
+            );
+
+            let track_no = inferred.track_num;
+            let title = inferred.title;
+
+            let out_filename = build_track_filename(track_no, &title, &self.config.desc_type);
             let dst_file = disc_out_dir.join(out_filename);
 
             let track_meta = TrackMetadata {
                 track_number: track_no,
-                title: title.to_string(),
+                title: title.clone(),
                 artist: artist.to_string(),
                 album: album.to_string(),
                 album_artist: Some(artist.to_string()),
