@@ -1,17 +1,13 @@
-# Task: rust-rewrite
+# Task: web-control-features
 
-- **Repo**: .
-- **Branch**: agent/rust-rewrite-20261101
+- **Repo**: /Users/alisonjoe/WorkSpace/MusicConvert
+- **Branch**: agent/web-control-features-20261108
 - **Base**: main
-- **Created**: 2026-11-01 16:20:44
+- **Created**: 2026-11-08 00:26:29
+- **Status**: Completed (L2 Verified)
 
 ## Implementation Scope & Verification
-- Keep changes strictly scoped to this task.
-- Follow TDD (Red-Green-Refactor) for business logic.
-- Verify using:
-  - POSIX (macOS/Linux): `../../Invoke-Build.sh verify`
-  - Windows: `pwsh ..\..\Invoke-Build.ps1 verify`
-- Commit using (Precision Staging):
-  - POSIX (macOS/Linux): `../../Invoke-Build.sh commit -Files "path/file" -Message "feat: description"`
-  - Windows: `pwsh ..\..\Invoke-Build.ps1 commit -Files "path/file" -Message "feat: description"`
-- NEVER use blanket staging (git add . / git add -A / git commit -a).
+- [x] Ticket 01: Core SQLite Query & Pagination Foundation (`crates/music-core/src/db.rs`)
+- [x] Ticket 02: Server API Endpoints & State Injection (`crates/music-convert/src/server/`)
+- [x] Ticket 03: WebUI Frontend Components & User Interaction (`web/dist/index.html`)
+- [x] L2 Verification: 32 tests passed across Cargo Workspace
