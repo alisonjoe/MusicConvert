@@ -46,6 +46,9 @@ async fn test_embedded_web_console_static_serving() {
     let html = res.text().await.expect("read html text");
     assert!(html.contains("MusicConvert 控制台"));
     assert!(html.contains("EventSource('/api/events')"));
+    assert!(html.contains("手动扫描转换"));
+    assert!(html.contains("切换音乐源文件夹"));
+    assert!(html.contains("已转换音乐库"));
 
     // 2. SPA fallback request for arbitrary route
     let res_fallback = client

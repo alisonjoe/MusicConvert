@@ -17,6 +17,7 @@
       --success: #10b981;
       --warning: #f59e0b;
       --danger: #ef4444;
+      --card-hover: #24344d;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -30,13 +31,15 @@
     header {
       background: var(--bg-secondary);
       border-bottom: 1px solid var(--border-color);
-      padding: 1rem 1.5rem;
+      padding: 0.85rem 1.5rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
       position: sticky;
       top: 0;
       z-index: 40;
+      flex-wrap: wrap;
+      gap: 0.75rem;
     }
     .brand {
       display: flex;
@@ -46,11 +49,38 @@
       font-size: 1.25rem;
       color: var(--accent);
     }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .src-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.825rem;
+      padding: 0.4rem 0.8rem;
+      border-radius: 0.5rem;
+      background: rgba(56, 189, 248, 0.1);
+      color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      cursor: pointer;
+      max-width: 380px;
+    }
+    .src-badge:hover {
+      background: rgba(56, 189, 248, 0.18);
+    }
+    .src-path-text {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .status-badge {
       display: inline-flex;
       align-items: center;
       gap: 0.4rem;
-      font-size: 0.85rem;
+      font-size: 0.825rem;
       padding: 0.35rem 0.75rem;
       border-radius: 9999px;
       background: rgba(16, 185, 129, 0.15);
@@ -78,6 +108,33 @@
       flex-direction: column;
       gap: 1.5rem;
     }
+
+    /* Tabs */
+    .tabs-nav {
+      display: flex;
+      gap: 0.5rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.25rem;
+    }
+    .tab-btn {
+      padding: 0.6rem 1.25rem;
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab-btn:hover {
+      color: var(--text-primary);
+    }
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
     .grid-stats {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -217,24 +274,111 @@
       cursor: pointer;
       border: none;
       transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
     }
-    .btn-primary { background: var(--accent); color: #000; }
+    .btn-sm {
+      padding: 0.3rem 0.6rem;
+      font-size: 0.8rem;
+    }
+    .btn-xs {
+      padding: 0.15rem 0.4rem;
+      font-size: 0.75rem;
+      border-radius: 0.25rem;
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-primary);
+      border: none;
+      cursor: pointer;
+    }
+    .btn-xs:hover { background: rgba(255, 255, 255, 0.2); }
+    .btn-primary { background: var(--accent); color: #000; font-weight: 600; }
     .btn-primary:hover { background: var(--accent-hover); color: #fff; }
     .btn-warning { background: var(--warning); color: #000; font-weight: 600; }
     .btn-warning:hover { opacity: 0.9; }
     .btn-secondary { background: var(--border-color); color: var(--text-primary); }
     .btn-secondary:hover { background: #475569; }
+    .btn-reconvert { background: rgba(56, 189, 248, 0.15); color: var(--accent); border: 1px solid rgba(56, 189, 248, 0.3); }
+    .btn-reconvert:hover { background: var(--accent); color: #000; }
+
+    /* Converted Library Table */
+    .table-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      overflow: hidden;
+    }
+    .table-toolbar {
+      padding: 1rem 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .search-box {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 0.375rem;
+      padding: 0.35rem 0.75rem;
+      width: 320px;
+      max-width: 100%;
+    }
+    .search-box input {
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      outline: none;
+      width: 100%;
+      font-size: 0.875rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.875rem;
+    }
+    th {
+      background: rgba(0, 0, 0, 0.2);
+      color: var(--text-secondary);
+      font-weight: 600;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+    td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+      word-break: break-all;
+    }
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .table-pagination {
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      background: rgba(0, 0, 0, 0.1);
+    }
 
     /* Modal */
     .modal-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.7);
+      background: rgba(0, 0, 0, 0.75);
       display: none;
       justify-content: center;
       align-items: center;
       z-index: 50;
       padding: 1rem;
+      backdrop-filter: blur(4px);
     }
     .modal-overlay.open {
       display: flex;
@@ -244,16 +388,18 @@
       border: 1px solid var(--border-color);
       border-radius: 0.75rem;
       padding: 1.5rem;
-      max-width: 500px;
+      max-width: 580px;
       width: 100%;
       display: flex;
       flex-direction: column;
       gap: 1rem;
+      max-height: 90vh;
+      overflow-y: auto;
     }
     .modal-title {
       font-size: 1.25rem;
       font-weight: 600;
-      color: var(--warning);
+      color: var(--accent);
     }
     .form-group {
       display: flex;
@@ -276,6 +422,31 @@
       outline: none;
       border-color: var(--accent);
     }
+    .folder-browser-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      max-height: 250px;
+      overflow-y: auto;
+      border: 1px solid var(--border-color);
+      border-radius: 0.375rem;
+      padding: 0.5rem;
+      background: var(--bg-primary);
+    }
+    .folder-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0.6rem;
+      border-radius: 0.25rem;
+      cursor: pointer;
+      color: var(--text-primary);
+      font-size: 0.875rem;
+    }
+    .folder-item:hover {
+      background: var(--border-color);
+      color: var(--accent);
+    }
     .modal-actions {
       display: flex;
       justify-content: flex-end;
@@ -289,6 +460,36 @@
       border: 1px dashed var(--border-color);
       border-radius: 0.75rem;
     }
+
+    /* Toast */
+    #toastContainer {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      z-index: 100;
+    }
+    .toast {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+      padding: 0.75rem 1.25rem;
+      border-radius: 0.5rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+      animation: fadeIn 0.2s ease;
+    }
+    .toast.toast-success { border-color: var(--success); color: var(--success); }
+    .toast.toast-error { border-color: var(--danger); color: var(--danger); }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 <body>
@@ -297,61 +498,153 @@
       <span>🎵</span>
       <span>MusicConvert 控制台</span>
     </div>
-    <div id="connectionStatus" class="status-badge disconnected">
-      <span class="dot"></span>
-      <span id="statusText">正在连接 SSE 总线...</span>
+    <div class="header-actions">
+      <!-- 音乐源文件夹 Badge & 选择器 -->
+      <div class="src-badge" onclick="openFolderModal()" title="点击切换音乐源目录">
+        <span>📂 监控源:</span>
+        <span id="currentSrcPath" class="src-path-text">加载中...</span>
+        <button class="btn-xs">更换</button>
+      </div>
+
+      <!-- 立即手动扫描转换按钮 -->
+      <button id="btnManualScan" class="btn btn-primary" onclick="triggerManualScan()">
+        <span>⚡</span>
+        <span id="btnScanText">手动扫描转换</span>
+      </button>
+
+      <!-- SSE 状态 -->
+      <div id="connectionStatus" class="status-badge disconnected">
+        <span class="dot"></span>
+        <span id="statusText">连接中...</span>
+      </div>
     </div>
   </header>
 
   <main>
-    <div class="grid-stats">
-      <div class="stat-card">
-        <span class="stat-title">活跃处理任务</span>
-        <span class="stat-value" id="activeCount">0</span>
+    <!-- 标签导航 -->
+    <div class="tabs-nav">
+      <button id="tabTasksBtn" class="tab-btn active" onclick="switchTab('tasks')">⚡ 实时任务大盘</button>
+      <button id="tabLibraryBtn" class="tab-btn" onclick="switchTab('library')">📦 已转换音乐库 (SQLite)</button>
+    </div>
+
+    <!-- TAB 1: 实时任务大盘 -->
+    <div id="tabTasksView" style="display: flex; flex-direction: column; gap: 1.5rem;">
+      <div class="grid-stats">
+        <div class="stat-card">
+          <span class="stat-title">活跃处理任务</span>
+          <span class="stat-value" id="activeCount">0</span>
+        </div>
+        <div class="stat-card warning-card">
+          <span class="stat-title">待审阅存疑专辑</span>
+          <span class="stat-value" id="reviewCount">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-title">已完成归档</span>
+          <span class="stat-value" id="historyCount">0</span>
+        </div>
       </div>
-      <div class="stat-card warning-card">
-        <span class="stat-title">待审阅存疑专辑</span>
-        <span class="stat-value" id="reviewCount">0</span>
+
+      <!-- 待审阅专区 -->
+      <div id="reviewSection" style="display: none;">
+        <h2 class="section-title" style="color: var(--warning);">
+          <span>⚠️</span> 待审阅专辑 (存疑挂起)
+        </h2>
+        <div id="reviewList" class="card-list"></div>
       </div>
-      <div class="stat-card">
-        <span class="stat-title">已完成归档</span>
-        <span class="stat-value" id="historyCount">0</span>
+
+      <!-- 活跃任务列表 -->
+      <div>
+        <h2 class="section-title">
+          <span>⚡</span> 活跃任务列表
+        </h2>
+        <div id="activeList" class="card-list">
+          <div class="empty-placeholder">暂无正在转码的批次</div>
+        </div>
+      </div>
+
+      <!-- 历史完成列表 (RingBuffer) -->
+      <div>
+        <h2 class="section-title">
+          <span>📜</span> 内存历史记录 (RingBuffer)
+        </h2>
+        <div id="historyList" class="card-list">
+          <div class="empty-placeholder">暂无近期历史记录</div>
+        </div>
       </div>
     </div>
 
-    <!-- 待审阅专区 -->
-    <div id="reviewSection" style="display: none;">
-      <h2 class="section-title" style="color: var(--warning);">
-        <span>⚠️</span> 待审阅专辑 (存疑挂起)
-      </h2>
-      <div id="reviewList" class="card-list"></div>
-    </div>
-
-    <!-- 活跃任务列表 -->
-    <div>
-      <h2 class="section-title">
-        <span>⚡</span> 活跃任务大盘
-      </h2>
-      <div id="activeList" class="card-list">
-        <div class="empty-placeholder">暂无正在转码的批次</div>
-      </div>
-    </div>
-
-    <!-- 历史记录列表 -->
-    <div>
-      <h2 class="section-title">
-        <span>📜</span> 历史完成记录 (RingBuffer)
-      </h2>
-      <div id="historyList" class="card-list">
-        <div class="empty-placeholder">暂无历史转换记录</div>
+    <!-- TAB 2: 已转换音乐库 (SQLite) -->
+    <div id="tabLibraryView" style="display: none; flex-direction: column; gap: 1.25rem;">
+      <div class="table-container">
+        <div class="table-toolbar">
+          <div class="search-box">
+            <span>🔍</span>
+            <input type="text" id="librarySearchInput" placeholder="搜索已转换音乐路径或文件名..." onkeydown="if(event.key==='Enter') searchConverted()" />
+            <button class="btn-xs" onclick="searchConverted()">搜索</button>
+          </div>
+          <div style="font-size: 0.85rem; color: var(--text-secondary);">
+            共 <span id="libraryTotalCount" style="color: var(--accent); font-weight: 600;">0</span> 条已转换记录
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 60px;">ID</th>
+              <th>文件路径</th>
+              <th style="width: 120px;">处理状态</th>
+              <th style="width: 180px;">转换时间</th>
+              <th style="width: 130px; text-align: center;">操作</th>
+            </tr>
+          </thead>
+          <tbody id="libraryTableBody">
+            <tr>
+              <td colspan="5" class="empty-placeholder">正在加载数据...</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="table-pagination">
+          <button class="btn btn-secondary btn-sm" id="btnPrevPage" onclick="prevLibraryPage()" disabled>上一页</button>
+          <span id="pageInfoText">第 1 页</span>
+          <button class="btn btn-secondary btn-sm" id="btnNextPage" onclick="nextLibraryPage()" disabled>下一页</button>
+        </div>
       </div>
     </div>
   </main>
 
-  <!-- 审阅编辑弹窗 -->
+  <!-- 目录浏览选择弹窗 -->
+  <div id="folderModal" class="modal-overlay">
+    <div class="modal">
+      <h3 class="modal-title">📂 切换音乐源文件夹</h3>
+      <p style="font-size: 0.85rem; color: var(--text-secondary);">
+        选择要监控与转码的音频目录。保存后服务将自动接管该路径下的音频扫描。
+      </p>
+      <div class="form-group">
+        <label>当前浏览目录路径</label>
+        <div style="display: flex; gap: 0.5rem;">
+          <input type="text" id="browserInputPath" style="flex: 1;" placeholder="/volume1/music/..." />
+          <button class="btn btn-secondary" onclick="browseToPath(document.getElementById('browserInputPath').value)">浏览</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <label>子文件夹列表</label>
+          <button class="btn-xs" onclick="navigateParentFolder()">⬆ 上一级</button>
+        </div>
+        <div id="browserFolderList" class="folder-browser-list">
+          <div style="color: var(--text-secondary); padding: 0.5rem;">正在读取目录...</div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeFolderModal()">取消</button>
+        <button class="btn btn-primary" onclick="submitSourcePath()">设为监控源目录</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 人工审阅修正弹窗 -->
   <div id="reviewModal" class="modal-overlay">
     <div class="modal">
-      <h3 class="modal-title">人工元数据审阅修正</h3>
+      <h3 class="modal-title" style="color: var(--warning);">✏️ 人工元数据审阅修正</h3>
       <p style="font-size: 0.85rem; color: var(--text-secondary);">
         当前批次在线元数据置信度较低或存在歧义。请核实或修正专辑信息，确认后调度器将立即放行并继续分轨与标签写入。
       </p>
@@ -372,17 +665,247 @@
         <input type="text" id="modalYear" placeholder="如 2004" />
       </div>
       <div class="modal-actions">
-        <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+        <button class="btn btn-secondary" onclick="closeReviewModal()">取消</button>
         <button class="btn btn-warning" onclick="submitApprove()">确认放行并转码</button>
       </div>
     </div>
   </div>
 
+  <!-- Toast Container -->
+  <div id="toastContainer"></div>
+
   <script>
     let activeTasks = [];
     let historyTasks = [];
     let currentReviewTaskId = null;
+    let currentBrowseParent = null;
 
+    // Converted Library state
+    let libraryLimit = 30;
+    let libraryOffset = 0;
+    let libraryTotal = 0;
+    let librarySearchQuery = '';
+
+    // Tab Switching
+    function switchTab(tab) {
+      const tabTasksBtn = document.getElementById('tabTasksBtn');
+      const tabLibraryBtn = document.getElementById('tabLibraryBtn');
+      const tabTasksView = document.getElementById('tabTasksView');
+      const tabLibraryView = document.getElementById('tabLibraryView');
+
+      if (tab === 'tasks') {
+        tabTasksBtn.classList.add('active');
+        tabLibraryBtn.classList.remove('active');
+        tabTasksView.style.display = 'flex';
+        tabLibraryView.style.display = 'none';
+      } else {
+        tabLibraryBtn.classList.add('active');
+        tabTasksBtn.classList.remove('active');
+        tabTasksView.style.display = 'none';
+        tabLibraryView.style.display = 'flex';
+        fetchConvertedLibrary();
+      }
+    }
+
+    // Config & Source path
+    async function fetchConfig() {
+      try {
+        const res = await fetch('/api/config');
+        if (res.ok) {
+          const cfg = await res.json();
+          document.getElementById('currentSrcPath').textContent = cfg.src_path || '(未配置)';
+          document.getElementById('browserInputPath').value = cfg.src_path || '/';
+        }
+      } catch (e) {
+        console.error('Failed to load config:', e);
+      }
+    }
+
+    // Manual Scan Trigger
+    async function triggerManualScan() {
+      const btn = document.getElementById('btnManualScan');
+      const btnText = document.getElementById('btnScanText');
+      btn.disabled = true;
+      btnText.textContent = '正在扫描...';
+
+      try {
+        const res = await fetch('/api/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast('⚡ 手动扫描已启动，正在发现音频并聚类处理', 'success');
+          fetchTasks();
+        } else {
+          showToast(data.message || '扫描请求失败', 'error');
+        }
+      } catch (e) {
+        showToast('请求异常: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btnText.textContent = '手动扫描转换';
+      }
+    }
+
+    // Folder Browser Modal
+    function openFolderModal() {
+      document.getElementById('folderModal').classList.add('open');
+      const curr = document.getElementById('browserInputPath').value || '/';
+      browseToPath(curr);
+    }
+
+    function closeFolderModal() {
+      document.getElementById('folderModal').classList.remove('open');
+    }
+
+    async function browseToPath(pathStr) {
+      const listEl = document.getElementById('browserFolderList');
+      listEl.innerHTML = '<div style="color: var(--text-secondary); padding: 0.5rem;">读取中...</div>';
+      try {
+        const res = await fetch(`/api/fs/browse?path=${encodeURIComponent(pathStr)}`);
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('browserInputPath').value = data.current;
+          currentBrowseParent = data.parent;
+          if (!data.directories || data.directories.length === 0) {
+            listEl.innerHTML = '<div style="color: var(--text-secondary); padding: 0.5rem;">此目录下无子文件夹</div>';
+          } else {
+            listEl.innerHTML = data.directories.map(d => {
+              const full = data.current.replace(/\/+$/, '') + '/' + d;
+              return `<div class="folder-item" onclick="browseToPath('${escapeJsString(full)}')">📁 ${escapeHtml(d)}</div>`;
+            }).join('');
+          }
+        } else {
+          listEl.innerHTML = '<div style="color: var(--danger); padding: 0.5rem;">无法打开目录或无权限</div>';
+        }
+      } catch (e) {
+        listEl.innerHTML = '<div style="color: var(--danger); padding: 0.5rem;">读取出错: ' + escapeHtml(e.message) + '</div>';
+      }
+    }
+
+    function navigateParentFolder() {
+      if (currentBrowseParent) {
+        browseToPath(currentBrowseParent);
+      }
+    }
+
+    async function submitSourcePath() {
+      const newPath = document.getElementById('browserInputPath').value.trim();
+      if (!newPath) return;
+
+      try {
+        const res = await fetch('/api/config/src-path', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ src_path: newPath })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(`监控源目录已更新为: ${newPath}`, 'success');
+          closeFolderModal();
+          fetchConfig();
+        } else {
+          showToast(data.message || '更新源目录失败', 'error');
+        }
+      } catch (e) {
+        showToast('请求失败: ' + e.message, 'error');
+      }
+    }
+
+    // Converted Library (SQLite)
+    async function fetchConvertedLibrary() {
+      const tbody = document.getElementById('libraryTableBody');
+      const url = `/api/converted?limit=${libraryLimit}&offset=${libraryOffset}&search=${encodeURIComponent(librarySearchQuery)}`;
+      try {
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          libraryTotal = data.total || 0;
+          document.getElementById('libraryTotalCount').textContent = libraryTotal;
+
+          if (!data.items || data.items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-placeholder">未找到已转换记录</td></tr>';
+          } else {
+            tbody.innerHTML = data.items.map(item => {
+              const d = item.created ? new Date(item.created * 1000).toLocaleString('zh-CN') : '-';
+              return `
+                <tr>
+                  <td style="color: var(--text-secondary);">${item.id}</td>
+                  <td><strong>${escapeHtml(item.music)}</strong></td>
+                  <td><span class="badge badge-completed">已转换 (state:${item.state})</span></td>
+                  <td style="color: var(--text-secondary); font-size: 0.8rem;">${d}</td>
+                  <td style="text-align: center;">
+                    <button class="btn btn-sm btn-reconvert" onclick="reconvertMusic('${escapeJsString(item.music)}')">
+                      🔄 重新转换
+                    </button>
+                  </td>
+                </tr>
+              `;
+            }).join('');
+          }
+
+          updatePaginationControls();
+        }
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="5" style="color: var(--danger); text-align: center;">加载失败: ${escapeHtml(e.message)}</td></tr>`;
+      }
+    }
+
+    function searchConverted() {
+      librarySearchQuery = document.getElementById('librarySearchInput').value.trim();
+      libraryOffset = 0;
+      fetchConvertedLibrary();
+    }
+
+    function prevLibraryPage() {
+      if (libraryOffset >= libraryLimit) {
+        libraryOffset -= libraryLimit;
+        fetchConvertedLibrary();
+      }
+    }
+
+    function nextLibraryPage() {
+      if (libraryOffset + libraryLimit < libraryTotal) {
+        libraryOffset += libraryLimit;
+        fetchConvertedLibrary();
+      }
+    }
+
+    function updatePaginationControls() {
+      const currentPage = Math.floor(libraryOffset / libraryLimit) + 1;
+      const totalPages = Math.max(1, Math.ceil(libraryTotal / libraryLimit));
+      document.getElementById('pageInfoText').textContent = `第 ${currentPage} / ${totalPages} 页`;
+      document.getElementById('btnPrevPage').disabled = (libraryOffset === 0);
+      document.getElementById('btnNextPage').disabled = (libraryOffset + libraryLimit >= libraryTotal);
+    }
+
+    async function reconvertMusic(musicPath) {
+      if (!confirm(`确定重新转换该文件/记录吗？\n${musicPath}\n系统将从已转换数据库中撤销并重新转码富化标签。`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/converted/reconvert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ music: musicPath })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(`已提交重新转换: ${musicPath}`, 'success');
+          fetchConvertedLibrary();
+          fetchTasks();
+        } else {
+          showToast(data.message || '重转请求失败', 'error');
+        }
+      } catch (e) {
+        showToast('请求失败: ' + e.message, 'error');
+      }
+    }
+
+    // Active & History Tasks API
     async function fetchTasks() {
       try {
         const res = await fetch('/api/tasks');
@@ -397,6 +920,7 @@
       }
     }
 
+    // SSE EventSource
     function initSSE() {
       const statusBadge = document.getElementById('connectionStatus');
       const statusText = document.getElementById('statusText');
@@ -410,7 +934,7 @@
 
       es.onerror = () => {
         statusBadge.className = 'status-badge disconnected';
-        statusText.textContent = 'SSE 断开，重连中...';
+        statusText.textContent = 'SSE 断开重连中...';
       };
 
       es.addEventListener('TaskDiscovered', (e) => {
@@ -476,13 +1000,11 @@
     }
 
     function renderAll() {
-      // 1. Stats
       const awaitingList = activeTasks.filter(t => t.status && (t.status === 'AwaitingReview' || t.status.type === 'AwaitingReview'));
       document.getElementById('activeCount').textContent = activeTasks.length;
       document.getElementById('reviewCount').textContent = awaitingList.length;
       document.getElementById('historyCount').textContent = historyTasks.length;
 
-      // 2. Review section
       const reviewSection = document.getElementById('reviewSection');
       const reviewList = document.getElementById('reviewList');
       if (awaitingList.length > 0) {
@@ -504,7 +1026,6 @@
         reviewList.innerHTML = '';
       }
 
-      // 3. Active List
       const activeContainer = document.getElementById('activeList');
       if (activeTasks.length === 0) {
         activeContainer.innerHTML = '<div class="empty-placeholder">暂无正在转码的批次</div>';
@@ -512,7 +1033,6 @@
         activeContainer.innerHTML = activeTasks.map(t => renderTaskCard(t)).join('');
       }
 
-      // 4. History List
       const historyContainer = document.getElementById('historyList');
       if (historyTasks.length === 0) {
         historyContainer.innerHTML = '<div class="empty-placeholder">暂无历史转换记录</div>';
@@ -575,7 +1095,7 @@
       document.getElementById('reviewModal').classList.add('open');
     }
 
-    function closeModal() {
+    function closeReviewModal() {
       document.getElementById('reviewModal').classList.remove('open');
       currentReviewTaskId = null;
     }
@@ -599,14 +1119,26 @@
           body: JSON.stringify(decision)
         });
         if (res.ok) {
-          closeModal();
+          closeReviewModal();
+          showToast('已放行并开始分轨转码', 'success');
           fetchTasks();
         } else {
-          alert('提交失败，请重试');
+          showToast('提交失败，请重试', 'error');
         }
       } catch (e) {
-        console.error('Approve failed:', e);
+        showToast('请求失败: ' + e.message, 'error');
       }
+    }
+
+    function showToast(msg, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.textContent = msg;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.remove();
+      }, 4000);
     }
 
     function escapeHtml(str) {
@@ -619,6 +1151,12 @@
         .replace(/'/g, '&#039;');
     }
 
+    function escapeJsString(str) {
+      if (!str) return '';
+      return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    }
+
+    fetchConfig();
     fetchTasks();
     initSSE();
   </script>
