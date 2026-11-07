@@ -1,7 +1,9 @@
+pub mod assets;
 pub mod handlers;
 pub mod routes;
 pub mod state;
 
+pub use assets::static_handler;
 pub use routes::create_router;
 pub use state::AppState;
 

@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MusicConvert 控制台 - 本地音乐治理引擎</title>
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-secondary: #1e293b;
+      --bg-card: #1e293b;
+      --border-color: #334155;
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-weight: 700;
+      font-size: 1.25rem;
+      color: var(--accent);
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.85rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 9999px;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .status-badge.disconnected {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--danger);
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    main {
+      flex: 1;
+      padding: 1.5rem;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    .grid-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+    }
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .stat-title {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .stat-card.warning-card {
+      border-color: rgba(245, 158, 11, 0.5);
+      background: linear-gradient(145deg, var(--bg-card), rgba(245, 158, 11, 0.08));
+    }
+    .stat-card.warning-card .stat-value {
+      color: var(--warning);
+    }
+    .section-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .card-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .task-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      transition: border-color 0.2s;
+    }
+    .task-card:hover {
+      border-color: var(--accent);
+    }
+    .task-card.awaiting-review {
+      border-color: var(--warning);
+      box-shadow: 0 0 15px rgba(245, 158, 11, 0.2);
+    }
+    .task-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+    .task-info h3 {
+      font-size: 1.1rem;
+      margin-bottom: 0.25rem;
+    }
+    .task-path {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      word-break: break-all;
+    }
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.375rem;
+      text-transform: uppercase;
+    }
+    .badge-review { background: rgba(245, 158, 11, 0.2); color: var(--warning); border: 1px solid var(--warning); }
+    .badge-transcoding { background: rgba(56, 189, 248, 0.2); color: var(--accent); }
+    .badge-completed { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+    .badge-failed { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+    .badge-discovered { background: rgba(148, 163, 184, 0.2); color: var(--text-secondary); }
+
+    .track-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      border-top: 1px solid var(--border-color);
+      padding-top: 0.75rem;
+    }
+    .track-item {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      font-size: 0.875rem;
+    }
+    .track-name {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .progress-bar-container {
+      width: 140px;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 9999px;
+      overflow: hidden;
+      position: relative;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 9999px;
+      transition: width 0.3s ease;
+    }
+    .progress-bar-fill.done {
+      background: var(--success);
+    }
+    .track-percent {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      width: 40px;
+      text-align: right;
+    }
+
+    .btn {
+      padding: 0.45rem 0.9rem;
+      border-radius: 0.375rem;
+      font-weight: 500;
+      font-size: 0.875rem;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+    .btn-primary { background: var(--accent); color: #000; }
+    .btn-primary:hover { background: var(--accent-hover); color: #fff; }
+    .btn-warning { background: var(--warning); color: #000; font-weight: 600; }
+    .btn-warning:hover { opacity: 0.9; }
+    .btn-secondary { background: var(--border-color); color: var(--text-primary); }
+    .btn-secondary:hover { background: #475569; }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 50;
+      padding: 1rem;
+    }
+    .modal-overlay.open {
+      display: flex;
+    }
+    .modal {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      max-width: 500px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .modal-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--warning);
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .form-group label {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+    .form-group input {
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 0.375rem;
+      padding: 0.6rem;
+      color: var(--text-primary);
+      font-size: 0.95rem;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+      margin-top: 0.5rem;
+    }
+    .empty-placeholder {
+      padding: 2.5rem;
+      text-align: center;
+      color: var(--text-secondary);
+      border: 1px dashed var(--border-color);
+      border-radius: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span>🎵</span>
+      <span>MusicConvert 控制台</span>
+    </div>
+    <div id="connectionStatus" class="status-badge disconnected">
+      <span class="dot"></span>
+      <span id="statusText">正在连接 SSE 总线...</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="grid-stats">
+      <div class="stat-card">
+        <span class="stat-title">活跃处理任务</span>
+        <span class="stat-value" id="activeCount">0</span>
+      </div>
+      <div class="stat-card warning-card">
+        <span class="stat-title">待审阅存疑专辑</span>
+        <span class="stat-value" id="reviewCount">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-title">已完成归档</span>
+        <span class="stat-value" id="historyCount">0</span>
+      </div>
+    </div>
+
+    <!-- 待审阅专区 -->
+    <div id="reviewSection" style="display: none;">
+      <h2 class="section-title" style="color: var(--warning);">
+        <span>⚠️</span> 待审阅专辑 (存疑挂起)
+      </h2>
+      <div id="reviewList" class="card-list"></div>
+    </div>
+
+    <!-- 活跃任务列表 -->
+    <div>
+      <h2 class="section-title">
+        <span>⚡</span> 活跃任务大盘
+      </h2>
+      <div id="activeList" class="card-list">
+        <div class="empty-placeholder">暂无正在转码的批次</div>
+      </div>
+    </div>
+
+    <!-- 历史记录列表 -->
+    <div>
+      <h2 class="section-title">
+        <span>📜</span> 历史完成记录 (RingBuffer)
+      </h2>
+      <div id="historyList" class="card-list">
+        <div class="empty-placeholder">暂无历史转换记录</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 审阅编辑弹窗 -->
+  <div id="reviewModal" class="modal-overlay">
+    <div class="modal">
+      <h3 class="modal-title">人工元数据审阅修正</h3>
+      <p style="font-size: 0.85rem; color: var(--text-secondary);">
+        当前批次在线元数据置信度较低或存在歧义。请核实或修正专辑信息，确认后调度器将立即放行并继续分轨与标签写入。
+      </p>
+      <div class="form-group">
+        <label>源文件路径</label>
+        <input type="text" id="modalPath" readonly style="opacity: 0.7;" />
+      </div>
+      <div class="form-group">
+        <label>艺术家 (Artist)</label>
+        <input type="text" id="modalArtist" />
+      </div>
+      <div class="form-group">
+        <label>专辑名称 (Album)</label>
+        <input type="text" id="modalAlbum" />
+      </div>
+      <div class="form-group">
+        <label>发行年份 (Year)</label>
+        <input type="text" id="modalYear" placeholder="如 2004" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+        <button class="btn btn-warning" onclick="submitApprove()">确认放行并转码</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let activeTasks = [];
+    let historyTasks = [];
+    let currentReviewTaskId = null;
+
+    async function fetchTasks() {
+      try {
+        const res = await fetch('/api/tasks');
+        if (res.ok) {
+          const data = await res.json();
+          activeTasks = data.active || [];
+          historyTasks = data.history || [];
+          renderAll();
+        }
+      } catch (e) {
+        console.error('Failed to fetch tasks:', e);
+      }
+    }
+
+    function initSSE() {
+      const statusBadge = document.getElementById('connectionStatus');
+      const statusText = document.getElementById('statusText');
+
+      const es = new EventSource('/api/events');
+
+      es.onopen = () => {
+        statusBadge.className = 'status-badge';
+        statusText.textContent = 'SSE 实时链路已连接';
+      };
+
+      es.onerror = () => {
+        statusBadge.className = 'status-badge disconnected';
+        statusText.textContent = 'SSE 断开，重连中...';
+      };
+
+      es.addEventListener('TaskDiscovered', (e) => {
+        const task = JSON.parse(e.data);
+        const idx = activeTasks.findIndex(t => t.task_id === task.task_id);
+        if (idx >= 0) activeTasks[idx] = task;
+        else activeTasks.unshift(task);
+        renderAll();
+      });
+
+      es.addEventListener('TaskStatusChanged', (e) => {
+        const payload = JSON.parse(e.data);
+        const task = activeTasks.find(t => t.task_id === payload.task_id);
+        if (task) {
+          task.status = payload.status;
+          renderAll();
+        }
+      });
+
+      es.addEventListener('TaskAwaitingReview', (e) => {
+        const payload = JSON.parse(e.data);
+        const idx = activeTasks.findIndex(t => t.task_id === payload.task_id);
+        if (idx >= 0) activeTasks[idx] = payload.task;
+        else activeTasks.unshift(payload.task);
+        renderAll();
+      });
+
+      es.addEventListener('TrackProgressUpdated', (e) => {
+        const payload = JSON.parse(e.data);
+        const task = activeTasks.find(t => t.task_id === payload.task_id);
+        if (task && task.tracks) {
+          const track = task.tracks.find(tr => tr.track_number === payload.track_number);
+          if (track) {
+            track.progress_percent = payload.progress_percent;
+            track.status = payload.status;
+            renderAll();
+          }
+        }
+      });
+
+      es.addEventListener('TaskCompleted', (e) => {
+        const payload = JSON.parse(e.data);
+        const idx = activeTasks.findIndex(t => t.task_id === payload.task_id);
+        if (idx >= 0) {
+          const [completed] = activeTasks.splice(idx, 1);
+          completed.status = { type: 'Completed' };
+          historyTasks.unshift(completed);
+          if (historyTasks.length > 50) historyTasks.pop();
+          renderAll();
+        }
+      });
+
+      es.addEventListener('TaskFailed', (e) => {
+        const payload = JSON.parse(e.data);
+        const idx = activeTasks.findIndex(t => t.task_id === payload.task_id);
+        if (idx >= 0) {
+          const [failed] = activeTasks.splice(idx, 1);
+          failed.status = { type: 'Failed', detail: { error: payload.error } };
+          historyTasks.unshift(failed);
+          renderAll();
+        }
+      });
+    }
+
+    function renderAll() {
+      // 1. Stats
+      const awaitingList = activeTasks.filter(t => t.status && (t.status === 'AwaitingReview' || t.status.type === 'AwaitingReview'));
+      document.getElementById('activeCount').textContent = activeTasks.length;
+      document.getElementById('reviewCount').textContent = awaitingList.length;
+      document.getElementById('historyCount').textContent = historyTasks.length;
+
+      // 2. Review section
+      const reviewSection = document.getElementById('reviewSection');
+      const reviewList = document.getElementById('reviewList');
+      if (awaitingList.length > 0) {
+        reviewSection.style.display = 'block';
+        reviewList.innerHTML = awaitingList.map(t => `
+          <div class="task-card awaiting-review">
+            <div class="task-header">
+              <div class="task-info">
+                <span class="badge badge-review">存疑待审阅</span>
+                <h3 style="margin-top: 0.4rem;">${escapeHtml(t.artist)} - ${escapeHtml(t.album)}</h3>
+                <div class="task-path">${escapeHtml(t.release_path)}</div>
+              </div>
+              <button class="btn btn-warning" onclick="openReviewModal('${t.task_id}')">✏️ 审核与修正</button>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        reviewSection.style.display = 'none';
+        reviewList.innerHTML = '';
+      }
+
+      // 3. Active List
+      const activeContainer = document.getElementById('activeList');
+      if (activeTasks.length === 0) {
+        activeContainer.innerHTML = '<div class="empty-placeholder">暂无正在转码的批次</div>';
+      } else {
+        activeContainer.innerHTML = activeTasks.map(t => renderTaskCard(t)).join('');
+      }
+
+      // 4. History List
+      const historyContainer = document.getElementById('historyList');
+      if (historyTasks.length === 0) {
+        historyContainer.innerHTML = '<div class="empty-placeholder">暂无历史转换记录</div>';
+      } else {
+        historyContainer.innerHTML = historyTasks.map(t => renderTaskCard(t, true)).join('');
+      }
+    }
+
+    function renderTaskCard(t, isHistory = false) {
+      const statusType = t.status && t.status.type ? t.status.type : t.status;
+      let badgeClass = 'badge-discovered';
+      let badgeLabel = statusType;
+      if (statusType === 'AwaitingReview') { badgeClass = 'badge-review'; badgeLabel = '待审阅'; }
+      else if (statusType === 'Transcoding') { badgeClass = 'badge-transcoding'; badgeLabel = '转码中'; }
+      else if (statusType === 'Completed') { badgeClass = 'badge-completed'; badgeLabel = '已完成'; }
+      else if (statusType === 'Failed') { badgeClass = 'badge-failed'; badgeLabel = '失败'; }
+      else if (statusType === 'MatchingMetadata') { badgeClass = 'badge-transcoding'; badgeLabel = '查询元数据'; }
+
+      const tracksHtml = (t.tracks && t.tracks.length > 0) ? `
+        <div class="track-list">
+          ${t.tracks.map(tr => {
+            const pct = Math.round(tr.progress_percent || 0);
+            return `
+              <div class="track-item">
+                <span style="color: var(--text-secondary); width: 24px;">#${tr.track_number}</span>
+                <span class="track-name">${escapeHtml(tr.title)}</span>
+                <div class="progress-bar-container">
+                  <div class="progress-bar-fill ${pct >= 100 ? 'done' : ''}" style="width: ${pct}%;"></div>
+                </div>
+                <span class="track-percent">${pct}%</span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      ` : '';
+
+      return `
+        <div class="task-card">
+          <div class="task-header">
+            <div class="task-info">
+              <span class="badge ${badgeClass}">${badgeLabel}</span>
+              <h3 style="margin-top: 0.4rem;">${escapeHtml(t.artist)} - ${escapeHtml(t.album)} ${t.year ? '(' + escapeHtml(t.year) + ')' : ''}</h3>
+              <div class="task-path">${escapeHtml(t.release_path)}</div>
+            </div>
+            ${statusType === 'AwaitingReview' ? `<button class="btn btn-warning" onclick="openReviewModal('${t.task_id}')">审阅</button>` : ''}
+          </div>
+          ${tracksHtml}
+        </div>
+      `;
+    }
+
+    function openReviewModal(taskId) {
+      const task = activeTasks.find(t => t.task_id === taskId);
+      if (!task) return;
+      currentReviewTaskId = taskId;
+      document.getElementById('modalPath').value = task.release_path;
+      document.getElementById('modalArtist').value = task.artist === 'Unknown Artist' ? '' : task.artist;
+      document.getElementById('modalAlbum').value = task.album === 'Unknown Album' ? '' : task.album;
+      document.getElementById('modalYear').value = task.year || '';
+      document.getElementById('reviewModal').classList.add('open');
+    }
+
+    function closeModal() {
+      document.getElementById('reviewModal').classList.remove('open');
+      currentReviewTaskId = null;
+    }
+
+    async function submitApprove() {
+      if (!currentReviewTaskId) return;
+      const artist = document.getElementById('modalArtist').value.trim();
+      const album = document.getElementById('modalAlbum').value.trim();
+      const year = document.getElementById('modalYear').value.trim();
+
+      const decision = {
+        override_artist: artist ? artist : undefined,
+        override_album: album ? album : undefined,
+        override_year: year ? year : undefined,
+      };
+
+      try {
+        const res = await fetch(`/api/tasks/${currentReviewTaskId}/approve`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(decision)
+        });
+        if (res.ok) {
+          closeModal();
+          fetchTasks();
+        } else {
+          alert('提交失败，请重试');
+        }
+      } catch (e) {
+        console.error('Approve failed:', e);
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    fetchTasks();
+    initSSE();
+  </script>
+</body>
+</html>
