@@ -27,6 +27,9 @@ pub struct Cli {
 
     #[arg(long, help = "Test Spotify connection and credentials")]
     pub test_spotify: bool,
+
+    #[arg(long, help = "Bind address for HTTP REST & SSE API server (e.g. 0.0.0.0:8080)")]
+    pub server: Option<String>,
 }
 
 #[cfg(test)]
@@ -40,6 +43,7 @@ mod tests {
         assert_eq!(cli.config, PathBuf::from("./config.yaml"));
         assert!(!cli.rescan_all);
         assert!(cli.rescan.is_none());
+        assert!(cli.server.is_none());
     }
 
     #[test]
@@ -49,9 +53,12 @@ mod tests {
             "--rescan",
             "/volume1/music/Album",
             "--rescan-all",
+            "--server",
+            "127.0.0.1:8080",
         ];
         let cli = Cli::try_parse_from(args).unwrap();
         assert_eq!(cli.rescan, Some("/volume1/music/Album".to_string()));
         assert!(cli.rescan_all);
+        assert_eq!(cli.server, Some("127.0.0.1:8080".to_string()));
     }
 }
