@@ -1,3 +1,6 @@
+use crate::engine::registry::TaskRegistry;
+use crate::engine::task::{BatchTask, TaskStatus, TrackItem, TrackStatus};
+use chrono::Utc;
 use music_audio::{
     build_track_filename, convert_single_track, parse_cue_file, probe_metadata,
     resolve_album_output_dir, resolve_disc_output_dir, split_cue_track, sync_missing_tracks,
@@ -8,20 +11,37 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
-use tracing::{error, info};
+use tokio::sync::RwLock;
+use tracing::{error, info, warn};
 
 pub struct ConvertOrchestrator {
     pub config: Config,
     pub db: Arc<Database>,
     pub provider_chain: Arc<ProviderChain>,
+    pub registry: Arc<RwLock<TaskRegistry>>,
 }
 
 impl ConvertOrchestrator {
-    pub fn new(config: Config, db: Arc<Database>, provider_chain: Arc<ProviderChain>) -> Self {
+    pub fn new(
+        config: Config,
+        db: Arc<Database>,
+        provider_chain: Arc<ProviderChain>,
+    ) -> Self {
+        let registry = Arc::new(RwLock::new(TaskRegistry::new(50, 128)));
+        Self::with_registry(config, db, provider_chain, registry)
+    }
+
+    pub fn with_registry(
+        config: Config,
+        db: Arc<Database>,
+        provider_chain: Arc<ProviderChain>,
+        registry: Arc<RwLock<TaskRegistry>>,
+    ) -> Self {
         Self {
             config,
             db,
             provider_chain,
+            registry,
         }
     }
 
@@ -42,9 +62,12 @@ impl ConvertOrchestrator {
             return;
         }
 
+        let task_id = format!("task_{}", Utc::now().timestamp_millis());
+
         info!(
-            "[Orchestrator] Processing ReleaseBatch at {:?} (unprocessed: {})",
+            "[Orchestrator] Processing ReleaseBatch at {:?} (task_id: {}, unprocessed: {})",
             batch.release_context,
+            task_id,
             unprocessed_files.len()
         );
 
@@ -64,15 +87,25 @@ impl ConvertOrchestrator {
         let mut query_artist = parent_dir_name.to_string();
         let mut query_album = album_dir_name.to_string();
 
+        let mut initial_tracks = Vec::new();
+
         // Try to read tags from the first available file or cue
         for f in &unprocessed_files {
             if let Some(cue) = &f.cue_path {
                 if let Ok(sheet) = parse_cue_file(cue) {
                     if !sheet.performer.is_empty() {
-                        query_artist = sheet.performer;
+                        query_artist = sheet.performer.clone();
                     }
                     if !sheet.title.is_empty() {
-                        query_album = sheet.title;
+                        query_album = sheet.title.clone();
+                    }
+                    for t in sheet.tracks {
+                        let artist = if t.performer.is_empty() {
+                            query_artist.clone()
+                        } else {
+                            t.performer
+                        };
+                        initial_tracks.push(TrackItem::new(t.track_num, t.title, artist));
                     }
                     break;
                 }
@@ -93,19 +126,107 @@ impl ConvertOrchestrator {
             }
         }
 
+        if initial_tracks.is_empty() {
+            for (idx, f) in unprocessed_files.iter().enumerate() {
+                let title = f
+                    .file_path
+                    .as_ref()
+                    .and_then(|p| p.file_stem())
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("Unknown Track");
+                initial_tracks.push(TrackItem::new(
+                    (idx + 1) as u32,
+                    title,
+                    query_artist.clone(),
+                ));
+            }
+        }
+
+        // Register BatchTask into TaskRegistry
+        let mut batch_task = BatchTask::new(
+            &task_id,
+            batch.release_context.to_string_lossy(),
+            &query_artist,
+            &query_album,
+        );
+        for t in initial_tracks {
+            batch_task.add_track(t);
+        }
+
+        {
+            let mut reg = self.registry.write().await;
+            reg.register_task(batch_task);
+            reg.update_task_status(&task_id, TaskStatus::MatchingMetadata);
+        }
+
         // 2. Fetch ReleaseMetadata via ProviderChain
         let query = MetadataQuery::new(&query_artist, &query_album);
         let online_meta = self.provider_chain.fetch(&query).await.unwrap_or(None);
 
-        let final_artist = online_meta
+        let mut final_artist = online_meta
             .as_ref()
             .map(|m| m.album_artist.clone())
-            .unwrap_or(query_artist);
-        let final_album = online_meta
+            .unwrap_or_else(|| query_artist.clone());
+        let mut final_album = online_meta
             .as_ref()
             .map(|m| m.album.clone())
-            .unwrap_or(query_album);
-        let final_year = online_meta.as_ref().and_then(|m| m.year.clone());
+            .unwrap_or_else(|| query_album.clone());
+        let mut final_year = online_meta.as_ref().and_then(|m| m.year.clone());
+
+        // Confidence calculation
+        let confidence = if online_meta.is_some() {
+            0.95
+        } else if query_artist == "Unknown Artist" || query_album == "Unknown Album" {
+            0.40
+        } else {
+            0.75
+        };
+
+        // If confidence is low, suspend for human review (Mode A)
+        if confidence < 0.60 {
+            info!(
+                "[Orchestrator] Task {} confidence is low ({:.2}), entering AwaitingReview",
+                task_id, confidence
+            );
+            let (review_tx, review_rx) = tokio::sync::oneshot::channel();
+            {
+                let mut reg = self.registry.write().await;
+                reg.mark_awaiting_review(&task_id, review_tx);
+            }
+
+            match review_rx.await {
+                Ok(decision) => {
+                    info!(
+                        "[Orchestrator] Task {} approved with overrides: {:?}",
+                        task_id, decision
+                    );
+                    if let Some(a) = decision.override_artist {
+                        final_artist = a;
+                    }
+                    if let Some(al) = decision.override_album {
+                        final_album = al;
+                    }
+                    if let Some(y) = decision.override_year {
+                        final_year = Some(y);
+                    }
+                }
+                Err(_) => {
+                    warn!(
+                        "[Orchestrator] Review channel dropped/cancelled for task {}",
+                        task_id
+                    );
+                    let mut reg = self.registry.write().await;
+                    reg.cancel_task(&task_id);
+                    return;
+                }
+            }
+        }
+
+        // Transition to Transcoding
+        {
+            let mut reg = self.registry.write().await;
+            reg.update_task_status(&task_id, TaskStatus::Transcoding);
+        }
 
         let out_root = Path::new(&self.config.output_root);
         let album_out_dir =
@@ -116,6 +237,8 @@ impl ConvertOrchestrator {
                 "[Orchestrator] Failed to create output directory {:?}: {}",
                 album_out_dir, e
             );
+            let mut reg = self.registry.write().await;
+            reg.fail_task(&task_id, format!("Failed to create directory: {}", e));
             return;
         }
 
@@ -131,6 +254,7 @@ impl ConvertOrchestrator {
         // 3. Convert files
         for file in &unprocessed_files {
             self.convert_file_item(
+                &task_id,
                 file,
                 &album_out_dir,
                 &final_artist,
@@ -156,11 +280,20 @@ impl ConvertOrchestrator {
                 source_label,
             );
         }
+
+        // Complete the task
+        {
+            let mut reg = self.registry.write().await;
+            reg.complete_task(&task_id);
+        }
+
+        info!("[Orchestrator] Finished task {}", task_id);
     }
 
     #[allow(clippy::too_many_arguments)]
     async fn convert_file_item(
         &self,
+        task_id: &str,
         item: &MusicFileInfo,
         album_out_dir: &Path,
         artist: &str,
@@ -221,6 +354,16 @@ impl ConvertOrchestrator {
                             ..Default::default()
                         };
 
+                        {
+                            let mut reg = self.registry.write().await;
+                            reg.update_track_progress(
+                                task_id,
+                                track.track_num,
+                                0.0,
+                                TrackStatus::Converting,
+                            );
+                        }
+
                         match split_cue_track(
                             audio_path,
                             &dst_file,
@@ -233,11 +376,27 @@ impl ConvertOrchestrator {
                         {
                             Ok(_) => {
                                 present_tracks.insert(track.track_num);
+                                let mut reg = self.registry.write().await;
+                                reg.update_track_progress(
+                                    task_id,
+                                    track.track_num,
+                                    100.0,
+                                    TrackStatus::Completed,
+                                );
                             }
                             Err(e) => {
                                 error!(
                                     "[Orchestrator] Failed to split track {}: {}",
                                     track.track_num, e
+                                );
+                                let mut reg = self.registry.write().await;
+                                reg.update_track_progress(
+                                    task_id,
+                                    track.track_num,
+                                    0.0,
+                                    TrackStatus::Failed {
+                                        error: e.to_string(),
+                                    },
                                 );
                             }
                         }
@@ -279,6 +438,11 @@ impl ConvertOrchestrator {
                 ..Default::default()
             };
 
+            {
+                let mut reg = self.registry.write().await;
+                reg.update_track_progress(task_id, track_no, 0.0, TrackStatus::Converting);
+            }
+
             match convert_single_track(
                 src_audio,
                 &dst_file,
@@ -293,11 +457,22 @@ impl ConvertOrchestrator {
                     if self.config.is_del_src {
                         let _ = fs::remove_file(src_audio);
                     }
+                    let mut reg = self.registry.write().await;
+                    reg.update_track_progress(task_id, track_no, 100.0, TrackStatus::Completed);
                 }
                 Err(e) => {
                     error!(
                         "[Orchestrator] Failed to convert single file {:?}: {}",
                         src_audio, e
+                    );
+                    let mut reg = self.registry.write().await;
+                    reg.update_track_progress(
+                        task_id,
+                        track_no,
+                        0.0,
+                        TrackStatus::Failed {
+                            error: e.to_string(),
+                        },
                     );
                 }
             }

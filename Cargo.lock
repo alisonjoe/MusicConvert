@@ -1021,12 +1021,15 @@ dependencies = [
 name = "music-convert"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "clap",
  "music-audio",
  "music-core",
  "music-provider",
  "notify",
  "notify-debouncer-mini",
+ "serde",
+ "serde_json",
  "tempfile",
  "thiserror",
  "tokio",
