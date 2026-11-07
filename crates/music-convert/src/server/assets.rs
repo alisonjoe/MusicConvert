@@ -17,12 +17,26 @@ pub async fn static_handler(uri: Uri) -> Response {
     match Assets::get(&path) {
         Some(content) => {
             let mime = mime_guess::from_path(&path).first_or_octet_stream();
-            ([(header::CONTENT_TYPE, mime.as_ref())], content.data).into_response()
+            (
+                [
+                    (header::CONTENT_TYPE, mime.as_ref()),
+                    (header::CACHE_CONTROL, "no-cache, no-store, must-revalidate"),
+                ],
+                content.data,
+            )
+                .into_response()
         }
         None => {
             // SPA fallback to index.html
             if let Some(index) = Assets::get("index.html") {
-                ([(header::CONTENT_TYPE, "text/html; charset=utf-8")], index.data).into_response()
+                (
+                    [
+                        (header::CONTENT_TYPE, "text/html; charset=utf-8"),
+                        (header::CACHE_CONTROL, "no-cache, no-store, must-revalidate"),
+                    ],
+                    index.data,
+                )
+                    .into_response()
             } else {
                 (StatusCode::NOT_FOUND, "Web console assets not found").into_response()
             }

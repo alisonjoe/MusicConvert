@@ -229,3 +229,50 @@ async fn test_orchestrator_integration_with_review() {
     assert_eq!(final_task.artist, "Manual Artist");
     assert_eq!(final_task.album, "Manual Album");
 }
+
+#[tokio::test]
+async fn test_orchestrator_in_flight_batch_dedup() {
+    let tmp = tempdir().expect("tempdir");
+    let src_dir = tmp.path().join("Artist/Album");
+    std::fs::create_dir_all(&src_dir).unwrap();
+    let audio_file = src_dir.join("01.mp3");
+    std::fs::write(&audio_file, b"fake mp3 data").unwrap();
+
+    let db_path = tmp.path().join("test.db");
+    let db = Arc::new(Database::open(&db_path).unwrap());
+
+    let mut config = Config::default();
+    config.output_root = tmp.path().join("output").to_string_lossy().to_string();
+
+    let provider = Arc::new(ProviderChain::new());
+    let orch = Arc::new(ConvertOrchestrator::new(config, db, provider));
+
+    let batch = ReleaseBatch {
+        release_context: src_dir.clone(),
+        files: vec![MusicFileInfo {
+            file_path: Some(audio_file),
+            cue_path: None,
+            file_suffix: "mp3".to_string(),
+        }],
+    };
+
+    // Simulate in-flight lock manually held
+    {
+        let mut lock = orch.in_flight.lock().unwrap();
+        lock.insert(src_dir.clone());
+    }
+
+    // Now call process_batch; it should immediately return and NOT register any task
+    orch.process_batch(&batch).await;
+
+    let reg = orch.registry.read().await;
+    assert_eq!(reg.active_count(), 0, "No task should be dispatched when batch is in-flight");
+    assert_eq!(reg.history_count(), 0);
+
+    // Release in-flight lock
+    drop(reg);
+    {
+        let mut lock = orch.in_flight.lock().unwrap();
+        lock.remove(&src_dir);
+    }
+}
