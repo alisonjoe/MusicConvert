@@ -1,3 +1,4 @@
+use crate::server::assets::static_handler;
 use crate::server::handlers::{
     approve_task, cancel_task, events_sse, get_task, health_check, list_tasks,
 };
@@ -21,6 +22,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/tasks/{id}/approve", post(approve_task))
         .route("/api/tasks/{id}/cancel", post(cancel_task))
         .route("/api/events", get(events_sse))
+        .fallback(static_handler)
         .layer(cors)
         .with_state(state)
 }
