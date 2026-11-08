@@ -41,6 +41,9 @@ pub struct Config {
     #[serde(default, deserialize_with = "deserialize_bool_or_int")]
     pub is_del_src: bool,
 
+    #[serde(default, deserialize_with = "deserialize_bool_or_int")]
+    pub force_reconvert: bool,
+
     #[serde(default)]
     pub src_path: String,
 
@@ -101,6 +104,7 @@ impl Default for Config {
         Self {
             is_split: false,
             is_del_src: false,
+            force_reconvert: false,
             src_path: "".to_string(),
             desc_type: default_desc_type(),
             desc_path: "".to_string(),
@@ -130,6 +134,15 @@ impl Config {
         let content = fs::read_to_string(path)?;
         let config: Config = serde_yaml::from_str(&content)?;
         Ok(config)
+    }
+
+    pub fn save_to_file<P: AsRef<Path>>(
+        &self,
+        path: P,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let yaml_str = serde_yaml::to_string(self)?;
+        fs::write(path, yaml_str)?;
+        Ok(())
     }
 
     pub fn is_spotify_enabled(&self) -> bool {
@@ -167,8 +180,27 @@ spotify_enabled: true
         assert_eq!(cfg.output_root, "/music/out");
         assert!(cfg.is_split);
         assert!(!cfg.is_del_src);
+        assert!(!cfg.force_reconvert);
         assert_eq!(cfg.desc_type, "FLAC");
         assert!(cfg.is_spotify_enabled());
         assert!(!cfg.is_discogs_enabled());
+    }
+
+    #[test]
+    fn test_config_force_reconvert_and_save() {
+        let dir = tempfile::tempdir().unwrap();
+        let cfg_path = dir.path().join("config.yaml");
+
+        let mut cfg = Config::default();
+        cfg.src_path = "/src".into();
+        cfg.output_root = "/out".into();
+        cfg.force_reconvert = true;
+
+        cfg.save_to_file(&cfg_path).unwrap();
+        let loaded = Config::load_from_file(&cfg_path).unwrap();
+
+        assert_eq!(loaded.src_path, "/src");
+        assert_eq!(loaded.output_root, "/out");
+        assert!(loaded.force_reconvert);
     }
 }

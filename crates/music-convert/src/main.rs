@@ -126,9 +126,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             Ok(addr) => {
                 let state = music_convert::server::AppState::new(
                     orchestrator.registry.clone(),
-                    Arc::new(config.clone()),
+                    orchestrator.config.clone(),
                     db.clone(),
                     Some(orchestrator.clone()),
+                    Some(config_path.clone()),
                 );
                 tokio::spawn(async move {
                     if let Err(e) = music_convert::server::start_server(state, addr).await {

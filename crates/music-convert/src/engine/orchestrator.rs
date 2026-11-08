@@ -3,8 +3,9 @@ use crate::engine::task::{BatchTask, TaskStatus, TrackItem, TrackStatus};
 use chrono::Utc;
 use music_audio::{
     build_track_filename, convert_single_track, infer_single_track_metadata, parse_cue_file,
-    parse_disc_number_from_name, probe_metadata, resolve_album_output_dir, resolve_disc_output_dir,
-    split_cue_track, sync_missing_tracks, title_matches,
+    parse_disc_number_from_name, parse_track_and_title_from_filename, probe_metadata,
+    resolve_album_output_dir, resolve_disc_output_dir, split_cue_track, sync_missing_tracks,
+    title_matches,
 };
 use music_core::{Config, Database, MusicFileInfo, ReleaseBatch, TrackMetadata};
 use music_provider::{MetadataQuery, ProviderChain};
@@ -29,7 +30,7 @@ impl Drop for InFlightGuard {
 }
 
 pub struct ConvertOrchestrator {
-    pub config: Config,
+    pub config: Arc<RwLock<Config>>,
     pub db: Arc<Database>,
     pub provider_chain: Arc<ProviderChain>,
     pub registry: Arc<RwLock<TaskRegistry>>,
@@ -53,12 +54,21 @@ impl ConvertOrchestrator {
         registry: Arc<RwLock<TaskRegistry>>,
     ) -> Self {
         Self {
-            config,
+            config: Arc::new(RwLock::new(config)),
             db,
             provider_chain,
             registry,
             in_flight: Arc::new(Mutex::new(HashSet::new())),
         }
+    }
+
+    pub async fn update_config(&self, new_config: Config) {
+        let mut cfg = self.config.write().await;
+        *cfg = new_config;
+    }
+
+    pub async fn get_config(&self) -> Config {
+        self.config.read().await.clone()
     }
 
     async fn log_task(&self, task_id: &str, stage: &str, level: &str, message: impl Into<String>) {
@@ -69,6 +79,10 @@ impl ConvertOrchestrator {
     }
 
     pub async fn process_batch(&self, batch: &ReleaseBatch) {
+        self.process_batch_ext(batch, false).await;
+    }
+
+    pub async fn process_batch_ext(&self, batch: &ReleaseBatch, force: bool) {
         let release_context = batch.release_context.clone();
 
         // Concurrency deduplication: ensure single in-flight task per release batch
@@ -90,14 +104,21 @@ impl ConvertOrchestrator {
             }
         };
 
+        let cfg = self.config.read().await.clone();
+        let should_force = force || cfg.force_reconvert;
+
         let mut unprocessed_files = Vec::new();
         for file in &batch.files {
             let p = file.file_path.as_ref().or(file.cue_path.as_ref());
             if let Some(path) = p {
                 let path_str = path.to_string_lossy();
-                match self.db.is_processed(&path_str) {
-                    Ok(true) => {}
-                    _ => unprocessed_files.push(file.clone()),
+                if should_force {
+                    unprocessed_files.push(file.clone());
+                } else {
+                    match self.db.is_processed(&path_str) {
+                        Ok(true) => {}
+                        _ => unprocessed_files.push(file.clone()),
+                    }
                 }
             }
         }
@@ -106,14 +127,65 @@ impl ConvertOrchestrator {
             return;
         }
 
+        // Natural sort files by disc number then filename/track number
+        unprocessed_files.sort_by(|a, b| {
+            let p_a = a.file_path.as_ref().or(a.cue_path.as_ref());
+            let p_b = b.file_path.as_ref().or(b.cue_path.as_ref());
+
+            let disc_a = p_a
+                .and_then(|p| p.parent())
+                .and_then(|p| p.file_name())
+                .and_then(|s| s.to_str())
+                .and_then(parse_disc_number_from_name)
+                .unwrap_or(1);
+            let disc_b = p_b
+                .and_then(|p| p.parent())
+                .and_then(|p| p.file_name())
+                .and_then(|s| s.to_str())
+                .and_then(parse_disc_number_from_name)
+                .unwrap_or(1);
+
+            if disc_a != disc_b {
+                return disc_a.cmp(&disc_b);
+            }
+
+            let fn_a = p_a
+                .and_then(|p| p.file_name())
+                .and_then(|s| s.to_str())
+                .unwrap_or("");
+            let fn_b = p_b
+                .and_then(|p| p.file_name())
+                .and_then(|s| s.to_str())
+                .unwrap_or("");
+
+            let (track_a, _) = parse_track_and_title_from_filename(fn_a);
+            let (track_b, _) = parse_track_and_title_from_filename(fn_b);
+
+            match (track_a, track_b) {
+                (Some(ta), Some(tb)) if ta != tb => ta.cmp(&tb),
+                _ => fn_a.cmp(fn_b),
+            }
+        });
+
         let task_id = format!("task_{}", Utc::now().timestamp_millis());
 
         info!(
-            "[Orchestrator] Processing ReleaseBatch at {:?} (task_id: {}, unprocessed: {})",
+            "[Orchestrator] Processing ReleaseBatch at {:?} (task_id: {}, unprocessed: {}, force: {})",
             batch.release_context,
             task_id,
-            unprocessed_files.len()
+            unprocessed_files.len(),
+            should_force
         );
+
+        if should_force {
+            self.log_task(
+                &task_id,
+                "LocalProbe",
+                "WARN",
+                "⚠️ 触发强制重新转换模式 (Force Reconvert)，跳过 SQLite 已转换缓存",
+            )
+            .await;
+        }
 
         // 1. Extract context clues: directory names or tags
         let album_dir_name = batch
@@ -380,7 +452,7 @@ impl ConvertOrchestrator {
             reg.update_task_status(&task_id, TaskStatus::Transcoding);
         }
 
-        let out_root = Path::new(&self.config.output_root);
+        let out_root = Path::new(&cfg.output_root);
         let album_out_dir =
             resolve_album_output_dir(out_root, &final_artist, &final_album, final_year.as_deref());
 
@@ -428,6 +500,7 @@ impl ConvertOrchestrator {
         // 3. Convert files
         for (idx, file) in unprocessed_files.iter().enumerate() {
             self.convert_file_item(
+                &cfg,
                 &task_id,
                 (idx + 1) as u32,
                 file,
@@ -489,6 +562,7 @@ impl ConvertOrchestrator {
     #[allow(clippy::too_many_arguments)]
     async fn convert_file_item(
         &self,
+        cfg: &Config,
         task_id: &str,
         fallback_index: u32,
         item: &MusicFileInfo,
@@ -516,7 +590,7 @@ impl ConvertOrchestrator {
         let _ = fs::create_dir_all(&disc_out_dir);
 
         // Case A: Split CUE sheet
-        if self.config.is_split {
+        if cfg.is_split {
             if let (Some(cue_path), Some(audio_path)) = (&item.cue_path, &item.file_path) {
                 if let Ok(sheet) = parse_cue_file(cue_path) {
                     for track in sheet.tracks {
@@ -531,7 +605,7 @@ impl ConvertOrchestrator {
                         };
 
                         let out_filename =
-                            build_track_filename(track.track_num, title, &self.config.desc_type);
+                            build_track_filename(track.track_num, title, &cfg.desc_type);
                         let dst_file = disc_out_dir.join(out_filename);
 
                         let track_meta = TrackMetadata {
@@ -562,7 +636,7 @@ impl ConvertOrchestrator {
                             track.index01_seconds,
                             track.duration_seconds,
                             Some(&track_meta),
-                            &self.config.desc_type,
+                            &cfg.desc_type,
                         )
                         .await
                         {
@@ -616,7 +690,7 @@ impl ConvertOrchestrator {
                     let _ = self.db.insert(&cue_path.to_string_lossy(), 1);
                     let _ = self.db.insert(&audio_path.to_string_lossy(), 1);
 
-                    if self.config.is_del_src {
+                    if cfg.is_del_src {
                         let _ = fs::remove_file(cue_path);
                         let _ = fs::remove_file(audio_path);
                     }
@@ -667,7 +741,7 @@ impl ConvertOrchestrator {
             )
             .await;
 
-            let out_filename = build_track_filename(track_no, &title, &self.config.desc_type);
+            let out_filename = build_track_filename(track_no, &title, &cfg.desc_type);
             let dst_file = disc_out_dir.join(out_filename);
 
             let track_meta = TrackMetadata {
@@ -691,14 +765,14 @@ impl ConvertOrchestrator {
                 src_audio,
                 &dst_file,
                 Some(&track_meta),
-                &self.config.desc_type,
+                &cfg.desc_type,
             )
             .await
             {
                 Ok(_) => {
                     present_tracks.insert(track_no);
                     let _ = self.db.insert(&src_audio.to_string_lossy(), 1);
-                    if self.config.is_del_src {
+                    if cfg.is_del_src {
                         let _ = fs::remove_file(src_audio);
                     }
                     {

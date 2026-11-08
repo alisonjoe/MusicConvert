@@ -39,8 +39,15 @@ async fn test_tc_009_web_control_api_suite() {
     db.insert("/music/artist/song2.flac", 1).unwrap();
     db.insert("/music/other/track.flac", 1).unwrap();
 
+    let cfg_file = temp_root.path().join("config.yaml");
     let registry = Arc::new(RwLock::new(TaskRegistry::new(10, 10)));
-    let state = AppState::new(registry, Arc::new(config), db.clone(), None);
+    let state = AppState::new(
+        registry,
+        Arc::new(RwLock::new(config)),
+        db.clone(),
+        None,
+        Some(cfg_file.clone()),
+    );
     let (addr, _handle) = spawn_test_server(state).await;
 
     let client = reqwest::Client::new();
@@ -131,14 +138,46 @@ async fn test_tc_009_web_control_api_suite() {
     assert_eq!(res.status(), reqwest::StatusCode::OK);
     assert!(!db.is_processed("/music/artist/song1.flac").unwrap());
 
-    // 6. POST /api/scan
+    // 6. POST /api/scan with force
     let res = client
         .post(format!("{}/api/scan", base_url))
-        .json(&serde_json::json!({}))
+        .json(&serde_json::json!({ "force": true }))
         .send()
         .await
         .unwrap();
     assert_eq!(res.status(), reqwest::StatusCode::OK);
     let json: Value = res.json().await.unwrap();
     assert_eq!(json["success"], true);
+
+    // 7. POST /api/config (save & persist)
+    let new_output = temp_root.path().join("new_output");
+    let mut updated_cfg = Config::default();
+    updated_cfg.src_path = new_src.to_str().unwrap().to_string();
+    updated_cfg.output_root = new_output.to_str().unwrap().to_string();
+    updated_cfg.force_reconvert = true;
+    updated_cfg.desc_type = "MP3".to_string();
+
+    let res = client
+        .post(format!("{}/api/config", base_url))
+        .json(&updated_cfg)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), reqwest::StatusCode::OK);
+
+    // Verify persisted file and GET /api/config
+    assert!(cfg_file.exists());
+    let reloaded = Config::load_from_file(&cfg_file).unwrap();
+    assert_eq!(reloaded.output_root, new_output.to_str().unwrap());
+    assert!(reloaded.force_reconvert);
+    assert_eq!(reloaded.desc_type, "MP3");
+
+    let res = client
+        .get(format!("{}/api/config", base_url))
+        .send()
+        .await
+        .unwrap();
+    let json: Value = res.json().await.unwrap();
+    assert_eq!(json["force_reconvert"], true);
+    assert_eq!(json["desc_type"], "MP3");
 }

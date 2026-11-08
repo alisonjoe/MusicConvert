@@ -6,10 +6,12 @@ use axum::{
     response::sse::{Event, Sse},
     Json,
 };
+use music_core::Config;
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::{Stream, StreamExt};
+use tracing::warn;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HealthResponse {
@@ -142,22 +144,51 @@ pub async fn events_sse(
     Sse::new(stream).keep_alive(axum::response::sse::KeepAlive::default())
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ConfigResponse {
-    pub src_path: String,
-    pub output_root: String,
-    pub desc_type: String,
-    pub is_split: bool,
+pub async fn get_config(State(state): State<AppState>) -> Json<Config> {
+    let mut cfg = state.config.read().await.clone();
+    let src = state.current_src_path.read().await.to_string_lossy().to_string();
+    if !src.is_empty() {
+        cfg.src_path = src;
+    }
+    Json(cfg)
 }
 
-pub async fn get_config(State(state): State<AppState>) -> Json<ConfigResponse> {
-    let src = state.current_src_path.read().await.to_string_lossy().to_string();
-    Json(ConfigResponse {
-        src_path: src,
-        output_root: state.config.output_root.clone(),
-        desc_type: state.config.desc_type.clone(),
-        is_split: state.config.is_split,
-    })
+pub async fn save_config(
+    State(state): State<AppState>,
+    Json(new_config): Json<Config>,
+) -> Result<Json<ActionResponse>, (StatusCode, Json<ActionResponse>)> {
+    // 1. Update memory config
+    {
+        let mut cfg = state.config.write().await;
+        *cfg = new_config.clone();
+    }
+    // 2. Update current_src_path
+    if !new_config.src_path.is_empty() {
+        let mut current_src = state.current_src_path.write().await;
+        *current_src = std::path::PathBuf::from(&new_config.src_path);
+    }
+    // 3. Update orchestrator
+    if let Some(orch) = &state.orchestrator {
+        orch.update_config(new_config.clone()).await;
+    }
+    // 4. Persist to file if configured
+    if let Some(path) = &state.config_file_path {
+        if let Err(e) = new_config.save_to_file(path) {
+            warn!("Failed to save config to file {:?}: {}", path, e);
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ActionResponse {
+                    success: false,
+                    message: format!("Failed to save config to file: {}", e),
+                }),
+            ));
+        }
+    }
+
+    Ok(Json(ActionResponse {
+        success: true,
+        message: "Config saved and applied successfully".to_string(),
+    }))
 }
 
 #[derive(Debug, Deserialize)]
@@ -327,7 +358,7 @@ pub async fn reconvert_music(
             if dir.exists() {
                 let batches = crate::monitor::scan_release_batches(&dir);
                 for b in batches {
-                    orch.process_batch(&b).await;
+                    orch.process_batch_ext(&b, true).await;
                 }
             }
         });
@@ -345,6 +376,7 @@ pub async fn reconvert_music(
 #[derive(Debug, Deserialize, Default)]
 pub struct ScanRequest {
     pub path: Option<String>,
+    pub force: Option<bool>,
 }
 
 pub async fn trigger_scan(
@@ -355,6 +387,7 @@ pub async fn trigger_scan(
         Some(p) if !p.is_empty() => std::path::PathBuf::from(p),
         _ => state.current_src_path.read().await.clone(),
     };
+    let force = payload.force.unwrap_or(false);
 
     if let Some(orch) = &state.orchestrator {
         let orch = orch.clone();
@@ -363,7 +396,7 @@ pub async fn trigger_scan(
             if target.exists() {
                 let batches = crate::monitor::scan_release_batches(&target);
                 for b in batches {
-                    orch.process_batch(&b).await;
+                    orch.process_batch_ext(&b, force).await;
                 }
             }
         });

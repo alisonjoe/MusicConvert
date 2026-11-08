@@ -383,18 +383,56 @@
     .modal-overlay.open {
       display: flex;
     }
-    .modal {
-      background: var(--bg-secondary);
-      border: 1px solid var(--border-color);
-      border-radius: 0.75rem;
-      padding: 1.5rem;
-      max-width: 580px;
-      width: 100%;
+    .modal.modal-lg {
+      max-width: 720px;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+    @media (max-width: 640px) {
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+    }
+    .form-check {
       display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      max-height: 90vh;
-      overflow-y: auto;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.88rem;
+      cursor: pointer;
+      user-select: none;
+    }
+    .config-fieldset {
+      border: 1px solid var(--border-color);
+      border-radius: 0.5rem;
+      padding: 0.85rem 1rem;
+      margin-top: 0.5rem;
+      background: rgba(255,255,255,0.015);
+    }
+    .config-legend {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--accent);
+      padding: 0 0.4rem;
+    }
+    .header-force-tag {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.82rem;
+      cursor: pointer;
+      color: #fbbf24;
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      padding: 0.35rem 0.65rem;
+      border-radius: 0.375rem;
+      user-select: none;
+      transition: all 0.2s;
+    }
+    .header-force-tag:hover {
+      background: rgba(245, 158, 11, 0.2);
     }
     .modal-title {
       font-size: 1.25rem;
@@ -623,10 +661,22 @@
         <button class="btn-xs">更换</button>
       </div>
 
+      <!-- 强制全量重转快捷选项 -->
+      <label class="header-force-tag" title="勾选后手动扫描将跳过已转换检测，对目录下所有音频全量重新富化和转码">
+        <input type="checkbox" id="chkForceScan" style="cursor: pointer;" />
+        <span>⚡ 强制重转</span>
+      </label>
+
       <!-- 立即手动扫描转换按钮 -->
       <button id="btnManualScan" class="btn btn-primary" onclick="triggerManualScan()">
-        <span>⚡</span>
+        <span>🔄</span>
         <span id="btnScanText">手动扫描转换</span>
+      </button>
+
+      <!-- 系统设置按钮 -->
+      <button class="btn btn-secondary" onclick="openConfigModal()" title="查看并修改系统设置、输出格式与元数据平台配置">
+        <span>⚙️</span>
+        <span>系统设置</span>
       </button>
 
       <!-- 实时日志终端按钮 -->
@@ -790,6 +840,116 @@
       <div class="modal-actions">
         <button class="btn btn-secondary" onclick="closeReviewModal()">取消</button>
         <button class="btn btn-warning" onclick="submitApprove()">确认放行并转码</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 系统配置管理弹窗 (Config Modal) -->
+  <div id="configModal" class="modal-overlay">
+    <div class="modal modal-lg">
+      <h3 class="modal-title">⚙️ 系统设置与转码配置</h3>
+      <p style="font-size: 0.85rem; color: var(--text-secondary);">
+        修改运行时策略与元数据服务配置。保存后将即时更新调度器并持久化写回配置文件。
+      </p>
+
+      <!-- 核心路径与编码 -->
+      <div class="form-row">
+        <div class="form-group">
+          <label>音频监控源目录 (src_path)</label>
+          <input type="text" id="cfgSrcPath" placeholder="/volume4/Music/import" />
+        </div>
+        <div class="form-group">
+          <label>音乐库输出根目录 (output_root)</label>
+          <input type="text" id="cfgOutputRoot" placeholder="/volume4/Music/Library" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>目标音频编码格式 (desc_type)</label>
+          <select id="cfgDescType" style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 0.375rem; padding: 0.6rem; color: var(--text-primary); font-size: 0.95rem;">
+            <option value="FLAC">FLAC (无损推荐)</option>
+            <option value="MP3">MP3 (有损兼容)</option>
+            <option value="WAV">WAV (原始波形)</option>
+            <option value="AAC">AAC (高压缩率)</option>
+          </select>
+        </div>
+        <div class="form-group" style="justify-content: flex-end; padding-bottom: 0.4rem;">
+          <label class="form-check" style="color: #fbbf24; font-weight: 500;">
+            <input type="checkbox" id="cfgForceReconvert" />
+            <span>⚡ 默认开启全量强制转换 (force_reconvert)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- 行为开关 -->
+      <div class="form-row" style="background: rgba(255,255,255,0.03); padding: 0.75rem; border-radius: 0.375rem; border: 1px solid var(--border-color);">
+        <label class="form-check">
+          <input type="checkbox" id="cfgIsSplit" />
+          <span>🔪 CUE 镜像拆分为独立分轨 (is_split)</span>
+        </label>
+        <label class="form-check" style="color: #ef4444;">
+          <input type="checkbox" id="cfgIsDelSrc" />
+          <span>🗑️ 转换成功后删除源文件 (is_del_src - 慎用)</span>
+        </label>
+      </div>
+
+      <!-- 网易云音乐配置 -->
+      <fieldset class="config-fieldset">
+        <legend class="config-legend">🔴 网易云音乐 (NetEase) 元数据配置</legend>
+        <div class="form-row">
+          <div class="form-group">
+            <label>认证模式 (netease_auth_mode)</label>
+            <select id="cfgNeteaseMode" style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 0.375rem; padding: 0.5rem; color: var(--text-primary);">
+              <option value="openapi">OpenAPI 开放平台模式</option>
+              <option value="cookie">网页 Cookie 模式</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>OpenAPI App ID</label>
+            <input type="text" id="cfgNeteaseAppId" placeholder="OpenAPI 应用 ID" />
+          </div>
+        </div>
+        <div class="form-group" style="margin-top: 0.5rem;">
+          <label>OpenAPI Secret</label>
+          <input type="password" id="cfgNeteaseAppSecret" placeholder="OpenAPI 应用 Secret" />
+        </div>
+        <div class="form-group" style="margin-top: 0.5rem;">
+          <label>Web Cookie (MUSIC_U / __csrf / NTES_SESS 等)</label>
+          <input type="password" id="cfgNeteaseCookie" placeholder="粘贴网易云 Web 端 Cookie" />
+        </div>
+      </fieldset>
+
+      <!-- 西文服务配置 -->
+      <fieldset class="config-fieldset">
+        <legend class="config-legend">🌐 欧美西文服务凭证 (Spotify / Discogs)</legend>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Spotify Client ID</label>
+            <input type="text" id="cfgSpotifyClientId" placeholder="Spotify 开发者 Client ID" />
+          </div>
+          <div class="form-group">
+            <label>Spotify Client Secret</label>
+            <input type="password" id="cfgSpotifyClientSecret" placeholder="Spotify Client Secret" />
+          </div>
+        </div>
+        <div class="form-row" style="margin-top: 0.5rem;">
+          <div class="form-group">
+            <label class="form-check" style="margin-top: 0.5rem;">
+              <input type="checkbox" id="cfgSpotifyEnabled" />
+              <span>启用 Spotify 搜索 (spotify_enabled)</span>
+            </label>
+          </div>
+          <div class="form-group">
+            <label>Discogs Personal Token</label>
+            <input type="password" id="cfgDiscogsToken" placeholder="用于古典音乐目录检索" />
+          </div>
+        </div>
+      </fieldset>
+
+      <div class="modal-actions" style="margin-top: 1rem;">
+        <button class="btn btn-secondary" onclick="closeConfigModal()">取消</button>
+        <button class="btn btn-primary" onclick="saveSystemConfig()">💾 保存并应用配置</button>
       </div>
     </div>
   </div>
@@ -1003,36 +1163,126 @@
       }
     }
 
-    // Config & Source path
+    // Global Config State
+    let currentConfigData = null;
+
     async function fetchConfig() {
       try {
         const res = await fetch('/api/config');
         if (res.ok) {
           const cfg = await res.json();
+          currentConfigData = cfg;
           document.getElementById('currentSrcPath').textContent = cfg.src_path || '(未配置)';
           document.getElementById('browserInputPath').value = cfg.src_path || '/';
+
+          // Sync force reconvert checkbox
+          const chkForce = document.getElementById('chkForceScan');
+          if (chkForce) {
+            chkForce.checked = !!cfg.force_reconvert;
+          }
+
+          // Populate config modal form
+          populateConfigForm(cfg);
         }
       } catch (e) {
         console.error('Failed to load config:', e);
       }
     }
 
-    // Manual Scan Trigger
+    function populateConfigForm(cfg) {
+      if (!cfg) return;
+      document.getElementById('cfgSrcPath').value = cfg.src_path || '';
+      document.getElementById('cfgOutputRoot').value = cfg.output_root || '';
+      document.getElementById('cfgDescType').value = cfg.desc_type || 'FLAC';
+      document.getElementById('cfgForceReconvert').checked = !!cfg.force_reconvert;
+      document.getElementById('cfgIsSplit').checked = !!cfg.is_split;
+      document.getElementById('cfgIsDelSrc').checked = !!cfg.is_del_src;
+
+      document.getElementById('cfgNeteaseMode').value = cfg.netease_auth_mode || 'openapi';
+      document.getElementById('cfgNeteaseAppId').value = cfg.netease_app_id || '';
+      document.getElementById('cfgNeteaseAppSecret').value = cfg.netease_app_secret || '';
+      document.getElementById('cfgNeteaseCookie').value = cfg.netease_cookie || '';
+
+      document.getElementById('cfgSpotifyClientId').value = cfg.spotify_client_id || '';
+      document.getElementById('cfgSpotifyClientSecret').value = cfg.spotify_client_secret || '';
+      document.getElementById('cfgSpotifyEnabled').checked = !!(cfg.spotify_enabled || cfg.spotify_premium);
+      document.getElementById('cfgDiscogsToken').value = cfg.discogs_token || '';
+    }
+
+    function openConfigModal() {
+      if (currentConfigData) {
+        populateConfigForm(currentConfigData);
+      } else {
+        fetchConfig();
+      }
+      document.getElementById('configModal').classList.add('open');
+    }
+
+    function closeConfigModal() {
+      document.getElementById('configModal').classList.remove('open');
+    }
+
+    async function saveSystemConfig() {
+      const updated = {
+        ...(currentConfigData || {}),
+        src_path: document.getElementById('cfgSrcPath').value.trim(),
+        output_root: document.getElementById('cfgOutputRoot').value.trim(),
+        desc_type: document.getElementById('cfgDescType').value,
+        force_reconvert: document.getElementById('cfgForceReconvert').checked,
+        is_split: document.getElementById('cfgIsSplit').checked,
+        is_del_src: document.getElementById('cfgIsDelSrc').checked,
+        netease_auth_mode: document.getElementById('cfgNeteaseMode').value,
+        netease_app_id: document.getElementById('cfgNeteaseAppId').value.trim(),
+        netease_app_secret: document.getElementById('cfgNeteaseAppSecret').value.trim(),
+        netease_cookie: document.getElementById('cfgNeteaseCookie').value.trim(),
+        spotify_client_id: document.getElementById('cfgSpotifyClientId').value.trim(),
+        spotify_client_secret: document.getElementById('cfgSpotifyClientSecret').value.trim(),
+        spotify_enabled: document.getElementById('cfgSpotifyEnabled').checked,
+        discogs_token: document.getElementById('cfgDiscogsToken').value.trim(),
+      };
+
+      try {
+        const res = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updated)
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast('✅ 系统配置已成功保存并即时热更新！', 'success');
+          closeConfigModal();
+          fetchConfig();
+        } else {
+          showToast(data.message || '配置保存失败', 'error');
+        }
+      } catch (e) {
+        showToast('保存异常: ' + e.message, 'error');
+      }
+    }
+
+    // Manual Scan Trigger with Force Option
     async function triggerManualScan() {
+      const chkForce = document.getElementById('chkForceScan');
+      const isForce = chkForce ? chkForce.checked : false;
+
       const btn = document.getElementById('btnManualScan');
       const btnText = document.getElementById('btnScanText');
       btn.disabled = true;
-      btnText.textContent = '正在扫描...';
+      btnText.textContent = isForce ? '⚡ 强制扫描中...' : '正在扫描...';
 
       try {
         const res = await fetch('/api/scan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({})
+          body: JSON.stringify({ force: isForce })
         });
         const data = await res.json();
         if (res.ok) {
-          showToast('⚡ 手动扫描已启动，正在发现音频并聚类处理', 'success');
+          if (isForce) {
+            showToast('⚡ 强制全量重转已触发：跳过 SQLite 记录，重新转码富化', 'success');
+          } else {
+            showToast('🔄 手动扫描已启动，正在发现音频并聚类处理', 'success');
+          }
           fetchTasks();
         } else {
           showToast(data.message || '扫描请求失败', 'error');
