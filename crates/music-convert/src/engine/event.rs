@@ -1,4 +1,4 @@
-use crate::engine::task::{BatchTask, TaskStatus, TrackStatus};
+use crate::engine::task::{BatchTask, TaskLogItem, TaskStatus, TrackStatus};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
@@ -19,6 +19,10 @@ pub enum EngineEvent {
         track_number: u32,
         progress_percent: f32,
         status: TrackStatus,
+    },
+    TaskLogAppended {
+        task_id: String,
+        log: TaskLogItem,
     },
     TaskCompleted {
         task_id: String,

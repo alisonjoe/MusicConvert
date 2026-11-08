@@ -130,6 +130,7 @@ pub async fn events_sse(
                 EngineEvent::TrackProgressUpdated { .. } => "TrackProgressUpdated",
                 EngineEvent::TaskCompleted { .. } => "TaskCompleted",
                 EngineEvent::TaskFailed { .. } => "TaskFailed",
+                EngineEvent::TaskLogAppended { .. } => "TaskLogAppended",
                 EngineEvent::LogEmitted { .. } => "LogEmitted",
             };
             let json_str = serde_json::to_string(&engine_event).unwrap_or_default();

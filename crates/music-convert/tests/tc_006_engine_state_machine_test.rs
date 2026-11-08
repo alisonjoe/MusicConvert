@@ -316,4 +316,63 @@ async fn test_orchestrator_single_file_track_inference_and_progress() {
     assert_eq!(task.tracks[0].track_number, 9);
     // Title must be parsed as "The Fame", NOT "Lady Gaga - The Fame - 09 - The Fame"!
     assert_eq!(task.tracks[0].title, "The Fame");
+
+    // Verify task logs were recorded
+    assert!(!task.logs.is_empty(), "Task must contain structured diagnostic logs");
+    assert!(task.logs.iter().any(|l| l.stage == "LocalProbe"));
+    assert!(task.logs.iter().any(|l| l.stage == "Transcode"));
+    assert!(task.logs.iter().any(|l| l.stage == "Finalize"));
+}
+
+#[tokio::test]
+async fn test_task_logs_append_and_event_broadcast() {
+    let mut registry = TaskRegistry::new(10, 20);
+    let mut rx = registry.subscribe();
+
+    let task = BatchTask::new("task_log_1", "/music/path", "Artist", "Album");
+    registry.register_task(task);
+
+    // Initial logs should be empty
+    let t = registry.get_task("task_log_1").unwrap();
+    assert_eq!(t.logs.len(), 0);
+
+    // Append log
+    registry.append_task_log("task_log_1", "LocalProbe", "INFO", "Probed local files");
+
+    // Event bus must receive TaskLogAppended
+    let event = rx.recv().await.expect("receive event");
+    match event {
+        EngineEvent::TaskDiscovered(_) => {
+            // First event is registered
+            let second = rx.recv().await.expect("receive log event");
+            match second {
+                EngineEvent::TaskLogAppended { task_id, log } => {
+                    assert_eq!(task_id, "task_log_1");
+                    assert_eq!(log.stage, "LocalProbe");
+                    assert_eq!(log.level, "INFO");
+                    assert_eq!(log.message, "Probed local files");
+                }
+                other => panic!("Unexpected event: {:?}", other),
+            }
+        }
+        EngineEvent::TaskLogAppended { task_id, log } => {
+            assert_eq!(task_id, "task_log_1");
+            assert_eq!(log.stage, "LocalProbe");
+            assert_eq!(log.level, "INFO");
+            assert_eq!(log.message, "Probed local files");
+        }
+        other => panic!("Unexpected first event: {:?}", other),
+    }
+
+    // Task in registry must contain the appended log
+    let updated = registry.get_task("task_log_1").unwrap();
+    assert_eq!(updated.logs.len(), 1);
+    assert_eq!(updated.logs[0].message, "Probed local files");
+
+    // Test FIFO capacity limit (100 logs max)
+    for i in 0..110 {
+        registry.append_task_log("task_log_1", "Transcode", "INFO", &format!("Log item {}", i));
+    }
+    let full = registry.get_task("task_log_1").unwrap();
+    assert_eq!(full.logs.len(), 100);
 }

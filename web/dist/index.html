@@ -461,6 +461,123 @@
       border-radius: 0.75rem;
     }
 
+    /* Task Log Terminal Panel */
+    .task-log-panel {
+      margin-top: 0.75rem;
+      background: #080c14;
+      border: 1px solid #1e293b;
+      border-radius: 0.5rem;
+      padding: 0.75rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.8rem;
+    }
+    .log-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 0.75rem;
+      color: #94a3b8;
+    }
+    .log-stream-content {
+      max-height: 220px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      scroll-behavior: smooth;
+    }
+    .log-line {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      line-height: 1.45;
+      word-break: break-all;
+    }
+    .log-time {
+      color: #475569;
+      font-size: 0.72rem;
+      flex-shrink: 0;
+    }
+    .badge-stage {
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 0.15rem 0.4rem;
+      border-radius: 0.25rem;
+      flex-shrink: 0;
+      text-transform: uppercase;
+    }
+    .badge-stage-LocalProbe { background: #334155; color: #cbd5e1; }
+    .badge-stage-MetadataQuery { background: #0369a1; color: #e0f2fe; }
+    .badge-stage-MusicBrainz { background: #1e3a8a; color: #bfdbfe; }
+    .badge-stage-NetEase { background: #991b1b; color: #fee2e2; }
+    .badge-stage-ITunes { background: #6b21a8; color: #f3e8ff; }
+    .badge-stage-Resolve { background: #854d0e; color: #fef08a; }
+    .badge-stage-Transcode { background: #c2410c; color: #ffedd5; }
+    .badge-stage-Tagging { background: #0f766e; color: #ccfbf1; }
+    .badge-stage-Finalize { background: #15803d; color: #dcfce7; }
+
+    .log-msg { color: #cbd5e1; }
+    .log-level-WARN .log-msg { color: #fbbf24; }
+    .log-level-ERROR .log-msg { color: #f87171; font-weight: 600; }
+
+    /* Global Log Drawer */
+    .drawer-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(3px);
+      z-index: 95;
+      display: none;
+    }
+    .drawer-overlay.open { display: block; }
+    .drawer-panel {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 680px;
+      max-width: 95vw;
+      background: #090d16;
+      border-left: 1px solid var(--border-color);
+      box-shadow: -8px 0 24px rgba(0,0,0,0.5);
+      z-index: 96;
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .drawer-panel.open { transform: translateX(0); }
+    .drawer-header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--bg-secondary);
+    }
+    .drawer-toolbar {
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid #1e293b;
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      background: #0d131f;
+      flex-wrap: wrap;
+    }
+    .drawer-body {
+      flex: 1;
+      padding: 1rem 1.25rem;
+      overflow-y: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.8rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
     /* Toast */
     #toastContainer {
       position: fixed;
@@ -510,6 +627,12 @@
       <button id="btnManualScan" class="btn btn-primary" onclick="triggerManualScan()">
         <span>⚡</span>
         <span id="btnScanText">手动扫描转换</span>
+      </button>
+
+      <!-- 实时日志终端按钮 -->
+      <button class="btn btn-secondary" onclick="toggleGlobalConsole()" title="查看抓取过程与系统实时日志">
+        <span>🖥️</span>
+        <span>实时日志 (<span id="globalLogCountBadge">0</span>)</span>
       </button>
 
       <!-- SSE 状态 -->
@@ -671,6 +794,35 @@
     </div>
   </div>
 
+  <!-- 全局日志抽屉 -->
+  <div id="drawerOverlay" class="drawer-overlay" onclick="toggleGlobalConsole()"></div>
+  <div id="drawerPanel" class="drawer-panel">
+    <div class="drawer-header">
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <span style="font-size: 1.1rem;">🖥️</span>
+        <h3 style="font-size: 1.05rem; font-weight: 600;">系统抓取与执行实时日志</h3>
+        <span id="drawerTotalCount" class="badge badge-discovered" style="margin-left: 0.5rem;">0 条</span>
+      </div>
+      <button class="btn-xs" onclick="toggleGlobalConsole()">✕ 关闭</button>
+    </div>
+    <div class="drawer-toolbar">
+      <select id="logLevelFilter" class="btn-xs" style="background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary);" onchange="filterGlobalLogs()">
+        <option value="ALL">全部日志 (ALL)</option>
+        <option value="WARN_ERR">仅警告与错误 (WARN+ERROR)</option>
+        <option value="META">仅抓取阶段 (Metadata)</option>
+        <option value="TRANSCODE">仅转码阶段 (Transcode)</option>
+      </select>
+      <input type="text" id="logSearchInput" placeholder="过滤关键字..." class="btn-xs" style="flex: 1; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.3rem 0.5rem;" oninput="filterGlobalLogs()" />
+      <button class="btn-xs" onclick="clearGlobalLogs()">🗑️ 清屏</button>
+      <label style="font-size: 0.75rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.25rem; cursor: pointer;">
+        <input type="checkbox" id="autoScrollCheck" checked /> 自动滚屏
+      </label>
+    </div>
+    <div id="drawerBody" class="drawer-body">
+      <div style="color: #64748b; text-align: center; padding: 2rem;">暂无日志输出，当任务开始抓取或转码时将实时在此呈现。</div>
+    </div>
+  </div>
+
   <!-- Toast Container -->
   <div id="toastContainer"></div>
 
@@ -680,11 +832,155 @@
     let currentReviewTaskId = null;
     let currentBrowseParent = null;
 
+    // Task Logs & Global Console state
+    let globalLogs = [];
+    let expandedTaskLogs = new Set();
+    let isGlobalDrawerOpen = false;
+
     // Converted Library state
     let libraryLimit = 30;
     let libraryOffset = 0;
     let libraryTotal = 0;
     let librarySearchQuery = '';
+
+    function formatTime(isoStr) {
+      if (!isoStr) return '';
+      try {
+        const d = new Date(isoStr);
+        return d.toTimeString().split(' ')[0];
+      } catch (e) {
+        return isoStr;
+      }
+    }
+
+    function renderTaskLogsHtml(logs) {
+      if (!logs || logs.length === 0) {
+        return '<div style="color: #64748b; padding: 0.5rem 0;">暂无诊断日志</div>';
+      }
+      return logs.map(l => renderSingleLogHtml(l)).join('');
+    }
+
+    function renderSingleLogHtml(l) {
+      const stage = escapeHtml(l.stage || 'General');
+      const timeStr = formatTime(l.timestamp);
+      const level = escapeHtml(l.level || 'INFO');
+      const msg = escapeHtml(l.message || '');
+      return `
+        <div class="log-line log-level-${level}">
+          <span class="log-time">[${timeStr}]</span>
+          <span class="badge-stage badge-stage-${stage}">${stage}</span>
+          <span class="log-msg">${msg}</span>
+        </div>
+      `;
+    }
+
+    function toggleTaskLogs(taskId) {
+      if (expandedTaskLogs.has(taskId)) {
+        expandedTaskLogs.delete(taskId);
+      } else {
+        expandedTaskLogs.add(taskId);
+      }
+      const el = document.getElementById(`logs-${taskId}`);
+      if (el) {
+        el.style.display = expandedTaskLogs.has(taskId) ? 'block' : 'none';
+        if (expandedTaskLogs.has(taskId)) {
+          const container = document.getElementById(`log-content-${taskId}`);
+          if (container) container.scrollTop = container.scrollHeight;
+        }
+      }
+    }
+
+    function toggleGlobalConsole() {
+      isGlobalDrawerOpen = !isGlobalDrawerOpen;
+      const overlay = document.getElementById('drawerOverlay');
+      const panel = document.getElementById('drawerPanel');
+      if (isGlobalDrawerOpen) {
+        overlay.classList.add('open');
+        panel.classList.add('open');
+        renderGlobalLogs();
+      } else {
+        overlay.classList.remove('open');
+        panel.classList.remove('open');
+      }
+    }
+
+    function logMatchesFilter(log, filter, search) {
+      if (filter === 'WARN_ERR' && log.level !== 'WARN' && log.level !== 'ERROR') return false;
+      if (filter === 'META' && !log.stage.includes('Meta') && !log.stage.includes('Probe') && !log.stage.includes('Resolve') && !log.stage.includes('MusicBrainz') && !log.stage.includes('NetEase') && !log.stage.includes('ITunes')) return false;
+      if (filter === 'TRANSCODE' && !log.stage.includes('Transcode') && !log.stage.includes('Tagging')) return false;
+      if (search && !log.message.toLowerCase().includes(search) && !log.stage.toLowerCase().includes(search)) return false;
+      return true;
+    }
+
+    function filterGlobalLogs() {
+      renderGlobalLogs();
+    }
+
+    function clearGlobalLogs() {
+      globalLogs = [];
+      document.getElementById('globalLogCountBadge').textContent = '0';
+      document.getElementById('drawerTotalCount').textContent = '0 条';
+      document.getElementById('drawerBody').innerHTML = '<div style="color: #64748b; text-align: center; padding: 2rem;">日志已清空。</div>';
+    }
+
+    function renderGlobalLogs() {
+      const drawerBody = document.getElementById('drawerBody');
+      const filter = document.getElementById('logLevelFilter').value;
+      const search = document.getElementById('logSearchInput').value.trim().toLowerCase();
+      const filtered = globalLogs.filter(item => logMatchesFilter(item.log, filter, search));
+      if (filtered.length === 0) {
+        drawerBody.innerHTML = '<div style="color: #64748b; text-align: center; padding: 2rem;">无匹配的日志记录。</div>';
+        return;
+      }
+      drawerBody.innerHTML = filtered.map(item => renderSingleLogHtml(item.log)).join('');
+      if (document.getElementById('autoScrollCheck').checked) {
+        drawerBody.scrollTop = drawerBody.scrollHeight;
+      }
+    }
+
+    function handleTaskLogAppended(taskId, log) {
+      // 1. Update task in local active / history list
+      const t = activeTasks.find(x => x.task_id === taskId) || historyTasks.find(x => x.task_id === taskId);
+      if (t) {
+        t.logs = t.logs || [];
+        t.logs.push(log);
+        if (t.logs.length > 100) t.logs.shift();
+
+        // Update button text if on DOM
+        const btn = document.getElementById(`log-btn-${taskId}`);
+        if (btn) btn.textContent = `📜 抓取日志 (${t.logs.length})`;
+
+        // Append to container if currently expanded
+        const container = document.getElementById(`log-content-${taskId}`);
+        if (container && expandedTaskLogs.has(taskId)) {
+          if (t.logs.length === 1) container.innerHTML = '';
+          container.insertAdjacentHTML('beforeend', renderSingleLogHtml(log));
+          container.scrollTop = container.scrollHeight;
+        }
+      }
+
+      // 2. Push to global logs
+      globalLogs.push({ taskId, log });
+      if (globalLogs.length > 500) globalLogs.shift();
+      const countEl = document.getElementById('globalLogCountBadge');
+      if (countEl) countEl.textContent = globalLogs.length;
+      const drawerCountEl = document.getElementById('drawerTotalCount');
+      if (drawerCountEl) drawerCountEl.textContent = `${globalLogs.length} 条`;
+
+      // 3. Append to drawer if open and matches filter
+      if (isGlobalDrawerOpen) {
+        const filter = document.getElementById('logLevelFilter').value;
+        const search = document.getElementById('logSearchInput').value.trim().toLowerCase();
+        if (logMatchesFilter(log, filter, search)) {
+          const drawerBody = document.getElementById('drawerBody');
+          if (globalLogs.length === 1) drawerBody.innerHTML = '';
+          drawerBody.insertAdjacentHTML('beforeend', renderSingleLogHtml(log));
+          if (document.getElementById('autoScrollCheck').checked) {
+            drawerBody.scrollTop = drawerBody.scrollHeight;
+          }
+        }
+      }
+    }
 
     // Tab Switching
     function switchTab(tab) {
@@ -989,6 +1285,12 @@
         }
       });
 
+      es.addEventListener('TaskLogAppended', (e) => {
+        const d = unpack(e);
+        if (!d || !d.task_id || !d.log) return;
+        handleTaskLogAppended(d.task_id, d.log);
+      });
+
       es.addEventListener('TaskCompleted', (e) => {
         const d = unpack(e);
         const taskId = d ? (d.task_id || d) : null;
@@ -1086,6 +1388,9 @@
       else if (statusType === 'Failed') { badgeClass = 'badge-failed'; badgeLabel = '失败'; }
       else if (statusType === 'MatchingMetadata') { badgeClass = 'badge-transcoding'; badgeLabel = '查询元数据'; }
 
+      const logCount = (t.logs && t.logs.length) || 0;
+      const isLogsExpanded = expandedTaskLogs.has(t.task_id);
+
       const tracksHtml = (t.tracks && t.tracks.length > 0) ? `
         <div class="track-list">
           ${t.tracks.map(tr => {
@@ -1112,9 +1417,23 @@
               <h3 style="margin-top: 0.4rem;">${escapeHtml(t.artist)} - ${escapeHtml(t.album)} ${t.year ? '(' + escapeHtml(t.year) + ')' : ''}</h3>
               <div class="task-path">${escapeHtml(t.release_path)}</div>
             </div>
-            ${statusType === 'AwaitingReview' ? `<button class="btn btn-warning" onclick="openReviewModal('${t.task_id}')">审阅</button>` : ''}
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <button id="log-btn-${t.task_id}" class="btn btn-xs btn-secondary" onclick="toggleTaskLogs('${t.task_id}')" title="展开/收起抓取过程与诊断日志">
+                📜 抓取日志 (${logCount})
+              </button>
+              ${statusType === 'AwaitingReview' ? `<button class="btn btn-warning" onclick="openReviewModal('${t.task_id}')">审阅</button>` : ''}
+            </div>
           </div>
           ${tracksHtml}
+          <div id="logs-${t.task_id}" class="task-log-panel" style="display: ${isLogsExpanded ? 'block' : 'none'};">
+            <div class="log-panel-header">
+              <span>📋 抓取与转码全生命周期诊断日志 (${logCount} 条)</span>
+              <button class="btn-xs" onclick="toggleTaskLogs('${t.task_id}')">收起</button>
+            </div>
+            <div class="log-stream-content" id="log-content-${t.task_id}">
+              ${renderTaskLogsHtml(t.logs)}
+            </div>
+          </div>
         </div>
       `;
     }
