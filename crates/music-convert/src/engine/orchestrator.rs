@@ -277,16 +277,18 @@ impl ConvertOrchestrator {
             )
             .await;
 
-            let mut reg = self.registry.write().await;
-            if let Some(task) = reg.get_task_mut(&task_id) {
-                task.artist = final_artist.clone();
-                task.album = final_album.clone();
-                for track in &mut task.tracks {
-                    if let Some(m_track) = meta.tracks.iter().find(|t| t.track_number == track.track_number) {
-                        track.title = m_track.title.clone();
-                    } else if let Some(m_track) = meta.tracks.iter().find(|t| title_matches(&track.title, &t.title)) {
-                        track.track_number = m_track.track_number;
-                        track.title = m_track.title.clone();
+            {
+                let mut reg = self.registry.write().await;
+                if let Some(task) = reg.get_task_mut(&task_id) {
+                    task.artist = final_artist.clone();
+                    task.album = final_album.clone();
+                    for track in &mut task.tracks {
+                        if let Some(m_track) = meta.tracks.iter().find(|t| t.track_number == track.track_number) {
+                            track.title = m_track.title.clone();
+                        } else if let Some(m_track) = meta.tracks.iter().find(|t| title_matches(&track.title, &t.title)) {
+                            track.track_number = m_track.track_number;
+                            track.title = m_track.title.clone();
+                        }
                     }
                 }
             }
@@ -566,13 +568,15 @@ impl ConvertOrchestrator {
                         {
                             Ok(_) => {
                                 present_tracks.insert(track.track_num);
-                                let mut reg = self.registry.write().await;
-                                reg.update_track_progress(
-                                    task_id,
-                                    track.track_num,
-                                    100.0,
-                                    TrackStatus::Completed,
-                                );
+                                {
+                                    let mut reg = self.registry.write().await;
+                                    reg.update_track_progress(
+                                        task_id,
+                                        track.track_num,
+                                        100.0,
+                                        TrackStatus::Completed,
+                                    );
+                                }
                                 self.log_task(
                                     task_id,
                                     "Tagging",
@@ -586,6 +590,17 @@ impl ConvertOrchestrator {
                                     "[Orchestrator] Failed to split track {}: {}",
                                     track.track_num, e
                                 );
+                                {
+                                    let mut reg = self.registry.write().await;
+                                    reg.update_track_progress(
+                                        task_id,
+                                        track.track_num,
+                                        0.0,
+                                        TrackStatus::Failed {
+                                            error: e.to_string(),
+                                        },
+                                    );
+                                }
                                 self.log_task(
                                     task_id,
                                     "Transcode",
@@ -593,15 +608,6 @@ impl ConvertOrchestrator {
                                     format!("CUE 分轨失败 #{:02} '{}': {}", track.track_num, title, e),
                                 )
                                 .await;
-                                let mut reg = self.registry.write().await;
-                                reg.update_track_progress(
-                                    task_id,
-                                    track.track_num,
-                                    0.0,
-                                    TrackStatus::Failed {
-                                        error: e.to_string(),
-                                    },
-                                );
                             }
                         }
                     }
@@ -695,8 +701,10 @@ impl ConvertOrchestrator {
                     if self.config.is_del_src {
                         let _ = fs::remove_file(src_audio);
                     }
-                    let mut reg = self.registry.write().await;
-                    reg.update_track_progress(task_id, track_no, 100.0, TrackStatus::Completed);
+                    {
+                        let mut reg = self.registry.write().await;
+                        reg.update_track_progress(task_id, track_no, 100.0, TrackStatus::Completed);
+                    }
                     self.log_task(
                         task_id,
                         "Tagging",
@@ -710,6 +718,17 @@ impl ConvertOrchestrator {
                         "[Orchestrator] Failed to convert single file {:?}: {}",
                         src_audio, e
                     );
+                    {
+                        let mut reg = self.registry.write().await;
+                        reg.update_track_progress(
+                            task_id,
+                            track_no,
+                            0.0,
+                            TrackStatus::Failed {
+                                error: e.to_string(),
+                            },
+                        );
+                    }
                     self.log_task(
                         task_id,
                         "Transcode",
@@ -717,15 +736,6 @@ impl ConvertOrchestrator {
                         format!("单曲 #{:02} '{}' 转码失败: {}", track_no, title, e),
                     )
                     .await;
-                    let mut reg = self.registry.write().await;
-                    reg.update_track_progress(
-                        task_id,
-                        track_no,
-                        0.0,
-                        TrackStatus::Failed {
-                            error: e.to_string(),
-                        },
-                    );
                 }
             }
         }

@@ -37,13 +37,32 @@ impl FfprobeFormat {
 pub fn parse_ffmpeg_stderr_tags(output: &str) -> HashMap<String, String> {
     let mut tags = HashMap::new();
     let mut in_metadata = false;
+    let mut in_video_stream = false;
 
     for line in output.lines() {
         let trimmed = line.trim();
-        if trimmed == "Metadata:" {
-            in_metadata = true;
+
+        if trimmed.starts_with("Stream #") {
+            in_video_stream = trimmed.contains("Video:");
+            in_metadata = false;
             continue;
         }
+
+        if trimmed.starts_with("Duration:") {
+            in_metadata = false;
+            continue;
+        }
+
+        if trimmed == "Metadata:" {
+            // Ignore video (cover art) stream metadata
+            if in_video_stream {
+                in_metadata = false;
+            } else {
+                in_metadata = true;
+            }
+            continue;
+        }
+
         if in_metadata {
             if !line.starts_with("    ") && !line.starts_with('\t') {
                 if trimmed.starts_with("Duration:") || trimmed.starts_with("Stream #") {
@@ -55,7 +74,19 @@ pub fn parse_ffmpeg_stderr_tags(output: &str) -> HashMap<String, String> {
                 let key = k.trim().to_lowercase();
                 let val = v.trim().to_string();
                 if !key.is_empty() && !val.is_empty() {
-                    tags.insert(key, val);
+                    // Prevent image filenames like 'cover.jpg' from polluting the track title
+                    if key == "title" {
+                        let lower = val.to_lowercase();
+                        if lower.ends_with(".jpg")
+                            || lower.ends_with(".jpeg")
+                            || lower.ends_with(".png")
+                            || lower.ends_with(".webp")
+                        {
+                            continue;
+                        }
+                    }
+                    // Container tags take precedence over subsequent stream tags
+                    tags.entry(key).or_insert(val);
                 }
             }
         }
@@ -111,5 +142,35 @@ pub async fn probe_metadata<P: AsRef<Path>>(file: P) -> Result<FfprobeOutput, Au
                 },
             })
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_ffmpeg_stderr_tags_with_embedded_cover() {
+        let sample = r#"
+Input #0, flac, from '/path/to/01.flac':
+  Metadata:
+    ARTIST          : Lady Gaga
+    TITLE           : Bad Romance
+    ALBUM           : The Fame
+    track           : 1
+    disc            : 1
+  Duration: 00:04:54.47, start: 0.000000, bitrate: 1062 kb/s
+    Stream #0:0: Audio: flac, 44100 Hz, stereo, s16
+    Stream #0:1: Video: mjpeg, yuvj420p
+    Metadata:
+      comment         : Cover (front)
+      title           : cover.jpg
+At least one output file must be specified
+"#;
+        let tags = parse_ffmpeg_stderr_tags(sample);
+        assert_eq!(tags.get("artist").map(|s| s.as_str()), Some("Lady Gaga"));
+        assert_eq!(tags.get("title").map(|s| s.as_str()), Some("Bad Romance"));
+        assert_eq!(tags.get("album").map(|s| s.as_str()), Some("The Fame"));
+        assert_eq!(tags.get("track").map(|s| s.as_str()), Some("1"));
     }
 }
