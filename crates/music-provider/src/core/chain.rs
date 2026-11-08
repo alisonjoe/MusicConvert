@@ -53,7 +53,24 @@ impl ProviderChain {
             query.artist, query.album, query.has_chinese_context
         );
 
-        for provider in &self.providers {
+        let mut ordered_providers: Vec<&Arc<dyn MetadataProvider>> = self.providers.iter().collect();
+        if query.has_chinese_context {
+            ordered_providers.sort_by_key(|p| match p.name() {
+                "NetEase" => 0,
+                "ITunes" => 1,
+                "MusicBrainz" => 2,
+                _ => 3,
+            });
+        } else {
+            ordered_providers.sort_by_key(|p| match p.name() {
+                "MusicBrainz" => 0,
+                "ITunes" => 1,
+                "NetEase" => 2,
+                _ => 3,
+            });
+        }
+
+        for provider in ordered_providers {
             if !provider.is_enabled() {
                 continue;
             }

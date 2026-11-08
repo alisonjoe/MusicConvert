@@ -56,11 +56,20 @@ pub fn parse_track_and_title_from_filename(filename: &str) -> (Option<u32>, Opti
                 }
             }
         }
+        // If no pure digit segment found, the last segment is likely the title (e.g. "Artist - Album - Title")
+        let title = parts.last().unwrap().to_string();
+        return (None, Some(title));
     } else if parts.len() == 2 {
-        // e.g. "01 - Bad Romance" or "Lady Gaga - Bad Romance"
+        // e.g. "01 - Bad Romance"
         if let Ok(n) = parts[0].parse::<u32>() {
             return (Some(n), Some(parts[1].to_string()));
         }
+        // e.g. "Bad Romance - 01"
+        if let Ok(n) = parts[1].parse::<u32>() {
+            return (Some(n), Some(parts[0].to_string()));
+        }
+        // e.g. "薛之谦 - 认真的雪" -> Artist - Title
+        return (None, Some(parts[1].to_string()));
     }
 
     // Pattern 3: Generic "Track 01" / "Track09"

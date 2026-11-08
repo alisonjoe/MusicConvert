@@ -165,6 +165,8 @@ impl TaskRegistry {
     }
 
     fn push_history(&mut self, task: BatchTask) {
+        self.history_buffer
+            .retain(|t| t.release_path != task.release_path);
         if self.history_buffer.len() >= self.history_capacity {
             self.history_buffer.pop_front();
         }

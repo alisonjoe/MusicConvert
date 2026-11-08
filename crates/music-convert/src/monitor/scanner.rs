@@ -1,14 +1,11 @@
+use music_audio::parse_disc_number_from_name;
 use music_core::{is_supported_extension, resolve_existing_path, MusicFileInfo, ReleaseBatch};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 pub fn is_disc_directory_name(name: &str) -> bool {
-    let upper = name.to_uppercase();
-    upper.starts_with("CD")
-        || upper.starts_with("DISC")
-        || upper == "TRACKS"
-        || upper.starts_with("VOL")
+    parse_disc_number_from_name(name).is_some() || name.eq_ignore_ascii_case("tracks")
 }
 
 pub fn scan_release_batches<P: AsRef<Path>>(root: P) -> Vec<ReleaseBatch> {
@@ -17,9 +14,19 @@ pub fn scan_release_batches<P: AsRef<Path>>(root: P) -> Vec<ReleaseBatch> {
         return Vec::new();
     }
 
-    // 1. Collect all files with supported extensions
+    // 1. Collect all files with supported extensions, strictly ignoring system dirs like @eaDir
     let mut files = Vec::new();
-    for entry in WalkDir::new(&resolved_root).into_iter().flatten() {
+    for entry in WalkDir::new(&resolved_root)
+        .into_iter()
+        .filter_entry(|e| {
+            if e.depth() == 0 {
+                return true;
+            }
+            let name = e.file_name().to_string_lossy();
+            !name.starts_with('.') && !name.starts_with('@') && name != "@eaDir"
+        })
+        .flatten()
+    {
         if entry.file_type().is_file() {
             let path = entry.path().to_path_buf();
             if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
