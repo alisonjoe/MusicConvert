@@ -19,8 +19,18 @@ echo "▶ 1. Building host native release binary..."
 cargo build --release --bin MusicConvert
 echo "✅ Native binary generated at: target/release/MusicConvert"
 
-# 2. Linux / Synology Cross-Compilation (if targets or cross available)
-if rustup target list 2>/dev/null | grep -q 'x86_64-unknown-linux-musl (installed)'; then
+# 2. Linux / Synology Cross-Compilation (Native zigbuild / musl / cross / docker)
+if command -v cargo-zigbuild >/dev/null 2>&1; then
+    echo "▶ 2. Cross-compiling for Synology AMD64 (musl) natively via cargo-zigbuild..."
+    cargo zigbuild --release --target x86_64-unknown-linux-musl --bin MusicConvert
+    cp target/x86_64-unknown-linux-musl/release/MusicConvert MusicConvert_synology_amd64
+    echo "✅ Synology AMD64 binary generated natively: MusicConvert_synology_amd64"
+elif command -v mise >/dev/null 2>&1 && mise which cargo-zigbuild >/dev/null 2>&1; then
+    echo "▶ 2. Cross-compiling for Synology AMD64 (musl) natively via mise cargo-zigbuild..."
+    mise exec -- cargo zigbuild --release --target x86_64-unknown-linux-musl --bin MusicConvert
+    cp target/x86_64-unknown-linux-musl/release/MusicConvert MusicConvert_synology_amd64
+    echo "✅ Synology AMD64 binary generated natively: MusicConvert_synology_amd64"
+elif rustup target list 2>/dev/null | grep -q 'x86_64-unknown-linux-musl (installed)'; then
     echo "▶ 2. Building Synology static musl binary (x86_64-unknown-linux-musl)..."
     cargo build --release --target x86_64-unknown-linux-musl --bin MusicConvert
     cp target/x86_64-unknown-linux-musl/release/MusicConvert MusicConvert_synology_amd64
@@ -29,6 +39,7 @@ elif command -v cross >/dev/null 2>&1; then
     echo "▶ 2. Cross-compiling for Linux targets via cross..."
     cross build --release --target x86_64-unknown-linux-musl --bin MusicConvert
     cp target/x86_64-unknown-linux-musl/release/MusicConvert MusicConvert_synology_amd64
+    echo "✅ Synology AMD64 binary generated: MusicConvert_synology_amd64"
 fi
 
 echo "🎉 Build complete."
