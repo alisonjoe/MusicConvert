@@ -61,6 +61,13 @@ impl ConvertOrchestrator {
         }
     }
 
+    async fn log_task(&self, task_id: &str, stage: &str, level: &str, message: impl Into<String>) {
+        let msg = message.into();
+        info!("[Task:{}] [{}] {}", task_id, stage, msg);
+        let mut reg = self.registry.write().await;
+        reg.append_task_log(task_id, stage, level, &msg);
+    }
+
     pub async fn process_batch(&self, batch: &ReleaseBatch) {
         let release_context = batch.release_context.clone();
 
@@ -224,7 +231,26 @@ impl ConvertOrchestrator {
             reg.update_task_status(&task_id, TaskStatus::MatchingMetadata);
         }
 
+        self.log_task(
+            &task_id,
+            "LocalProbe",
+            "INFO",
+            format!(
+                "本地批次发现: {:?}, 提取候选: 艺术家='{}', 专辑='{}', 包含 {} 首曲目",
+                batch.release_context, query_artist, query_album, unprocessed_files.len()
+            ),
+        )
+        .await;
+
         // 2. Fetch ReleaseMetadata via ProviderChain
+        self.log_task(
+            &task_id,
+            "MetadataQuery",
+            "INFO",
+            format!("启动元数据责任链检索: 艺术家='{}', 专辑='{}'", query_artist, query_album),
+        )
+        .await;
+
         let query = MetadataQuery::new(&query_artist, &query_album);
         let online_meta = self.provider_chain.fetch(&query).await.unwrap_or(None);
 
@@ -240,6 +266,17 @@ impl ConvertOrchestrator {
 
         // Standardize registry task metadata if online meta available
         if let Some(meta) = &online_meta {
+            self.log_task(
+                &task_id,
+                "MetadataQuery",
+                "INFO",
+                format!(
+                    "元数据命中成功 [来源: {}]: 官方艺术家='{}', 专辑='{}', 发行年份={:?}, 包含 {} 首曲目",
+                    meta.source, meta.album_artist, meta.album, meta.year, meta.tracks.len()
+                ),
+            )
+            .await;
+
             let mut reg = self.registry.write().await;
             if let Some(task) = reg.get_task_mut(&task_id) {
                 task.artist = final_artist.clone();
@@ -253,6 +290,14 @@ impl ConvertOrchestrator {
                     }
                 }
             }
+        } else {
+            self.log_task(
+                &task_id,
+                "MetadataQuery",
+                "WARN",
+                "在线元数据源未匹配到高置信度结果，将继续使用本地识别标签",
+            )
+            .await;
         }
 
         // Confidence calculation
@@ -264,8 +309,24 @@ impl ConvertOrchestrator {
             0.75
         };
 
+        self.log_task(
+            &task_id,
+            "Resolve",
+            "INFO",
+            format!("元数据置信度评分: {:.2} (人工审核阈值: 0.60)", confidence),
+        )
+        .await;
+
         // If confidence is low, suspend for human review (Mode A)
         if confidence < 0.60 {
+            self.log_task(
+                &task_id,
+                "Resolve",
+                "WARN",
+                format!("置信度低于阈值 ({:.2} < 0.60)，任务进入 [待审阅] 状态，等待控制台人工核验", confidence),
+            )
+            .await;
+
             info!(
                 "[Orchestrator] Task {} confidence is low ({:.2}), entering AwaitingReview",
                 task_id, confidence
@@ -291,6 +352,13 @@ impl ConvertOrchestrator {
                     if let Some(y) = decision.override_year {
                         final_year = Some(y);
                     }
+                    self.log_task(
+                        &task_id,
+                        "Resolve",
+                        "INFO",
+                        format!("人工审阅放行: 最终艺术家='{}', 专辑='{}', 年份={:?}", final_artist, final_album, final_year),
+                    )
+                    .await;
                 }
                 Err(_) => {
                     warn!(
@@ -313,6 +381,14 @@ impl ConvertOrchestrator {
         let out_root = Path::new(&self.config.output_root);
         let album_out_dir =
             resolve_album_output_dir(out_root, &final_artist, &final_album, final_year.as_deref());
+
+        self.log_task(
+            &task_id,
+            "Transcode",
+            "INFO",
+            format!("进入转码流程，确保输出目录: {:?}", album_out_dir),
+        )
+        .await;
 
         if let Err(e) = fs::create_dir_all(&album_out_dir) {
             error!(
@@ -362,7 +438,27 @@ impl ConvertOrchestrator {
                 &present_tracks,
                 source_label,
             );
+            self.log_task(
+                &task_id,
+                "Finalize",
+                "INFO",
+                format!(
+                    "音轨完整性校验 [来源: {}]: 本地处理 {} 首 / 官方总曲目 {} 首",
+                    source_label,
+                    present_tracks.len(),
+                    all_track_titles.len()
+                ),
+            )
+            .await;
         }
+
+        self.log_task(
+            &task_id,
+            "Finalize",
+            "INFO",
+            format!("批次转换任务 {} 全部完成，已记录至 SQLite 本地数据库", task_id),
+        )
+        .await;
 
         // Complete the task
         {
@@ -467,12 +563,26 @@ impl ConvertOrchestrator {
                                     100.0,
                                     TrackStatus::Completed,
                                 );
+                                self.log_task(
+                                    task_id,
+                                    "Tagging",
+                                    "INFO",
+                                    format!("CUE 分轨完成 #{:02} '{}'，注入标签与时间戳", track.track_num, title),
+                                )
+                                .await;
                             }
                             Err(e) => {
                                 error!(
                                     "[Orchestrator] Failed to split track {}: {}",
                                     track.track_num, e
                                 );
+                                self.log_task(
+                                    task_id,
+                                    "Transcode",
+                                    "ERROR",
+                                    format!("CUE 分轨失败 #{:02} '{}': {}", track.track_num, title, e),
+                                )
+                                .await;
                                 let mut reg = self.registry.write().await;
                                 reg.update_track_progress(
                                     task_id,
@@ -533,6 +643,14 @@ impl ConvertOrchestrator {
             let track_no = inferred.track_num;
             let title = inferred.title;
 
+            self.log_task(
+                task_id,
+                "Transcode",
+                "INFO",
+                format!("单曲音轨推断: '{:?}' -> 确定音轨号 #{:02}, 曲名 '{}'", fn_stem, track_no, title),
+            )
+            .await;
+
             let out_filename = build_track_filename(track_no, &title, &self.config.desc_type);
             let dst_file = disc_out_dir.join(out_filename);
 
@@ -569,12 +687,26 @@ impl ConvertOrchestrator {
                     }
                     let mut reg = self.registry.write().await;
                     reg.update_track_progress(task_id, track_no, 100.0, TrackStatus::Completed);
+                    self.log_task(
+                        task_id,
+                        "Tagging",
+                        "INFO",
+                        format!("单曲完成 #{:02} '{}'，注入标签与封面", track_no, title),
+                    )
+                    .await;
                 }
                 Err(e) => {
                     error!(
                         "[Orchestrator] Failed to convert single file {:?}: {}",
                         src_audio, e
                     );
+                    self.log_task(
+                        task_id,
+                        "Transcode",
+                        "ERROR",
+                        format!("单曲 #{:02} '{}' 转码失败: {}", track_no, title, e),
+                    )
+                    .await;
                     let mut reg = self.registry.write().await;
                     reg.update_track_progress(
                         task_id,

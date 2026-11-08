@@ -1,5 +1,5 @@
 use crate::engine::event::EngineEvent;
-use crate::engine::task::{BatchTask, TaskStatus, TrackStatus};
+use crate::engine::task::{BatchTask, TaskLogItem, TaskStatus, TrackStatus};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use tokio::sync::{broadcast, oneshot};
@@ -71,6 +71,17 @@ impl TaskRegistry {
                 track_number,
                 progress_percent: progress,
                 status,
+            });
+        }
+    }
+
+    pub fn append_task_log(&mut self, task_id: &str, stage: &str, level: &str, message: &str) {
+        let log_item = TaskLogItem::new(stage, level, message);
+        if let Some(task) = self.active_tasks.get_mut(task_id) {
+            task.add_log(log_item.clone());
+            self.emit(EngineEvent::TaskLogAppended {
+                task_id: task_id.to_string(),
+                log: log_item,
             });
         }
     }

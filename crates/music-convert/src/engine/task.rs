@@ -46,6 +46,25 @@ impl TrackItem {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TaskLogItem {
+    pub timestamp: String,
+    pub level: String,
+    pub stage: String,
+    pub message: String,
+}
+
+impl TaskLogItem {
+    pub fn new(stage: impl Into<String>, level: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            timestamp: Utc::now().to_rfc3339(),
+            stage: stage.into(),
+            level: level.into(),
+            message: message.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BatchTask {
     pub task_id: String,
     pub release_path: String,
@@ -55,6 +74,7 @@ pub struct BatchTask {
     pub status: TaskStatus,
     pub confidence: f32,
     pub tracks: Vec<TrackItem>,
+    pub logs: Vec<TaskLogItem>,
     pub created_at: String,
     pub updated_at: String,
     pub error_message: Option<String>,
@@ -77,10 +97,19 @@ impl BatchTask {
             status: TaskStatus::Discovered,
             confidence: 1.0,
             tracks: Vec::new(),
+            logs: Vec::new(),
             created_at: now.clone(),
             updated_at: now,
             error_message: None,
         }
+    }
+
+    pub fn add_log(&mut self, log: TaskLogItem) {
+        if self.logs.len() >= 100 {
+            self.logs.remove(0);
+        }
+        self.logs.push(log);
+        self.updated_at = Utc::now().to_rfc3339();
     }
 
     pub fn add_track(&mut self, track: TrackItem) {
