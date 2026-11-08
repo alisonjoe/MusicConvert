@@ -1,5 +1,22 @@
 use music_core::sanitize_filename;
+use regex::Regex;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
+
+static RE_DISC_DIR: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)^(?:cd|disc|disk|vol|volume)[\s._-]*(\d{1,3})$").unwrap()
+});
+
+/// Parses disc number from directory names such as "CD 01", "CD1", "CD_02", "Disc 1", "DISC 02", "Vol 1"
+pub fn parse_disc_number_from_name(name: &str) -> Option<u32> {
+    let clean = name.trim();
+    if let Some(caps) = RE_DISC_DIR.captures(clean) {
+        if let Some(m) = caps.get(1) {
+            return m.as_str().parse::<u32>().ok().filter(|&n| n > 0 && n < 100);
+        }
+    }
+    None
+}
 
 pub fn resolve_album_output_dir<P: AsRef<Path>>(
     output_root: P,

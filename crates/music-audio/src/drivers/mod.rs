@@ -5,5 +5,5 @@ pub mod metaflac;
 
 pub use cli::run_command;
 pub use ffmpeg::{convert_single_track, split_cue_track};
-pub use ffprobe::{probe_metadata, FfprobeFormat, FfprobeOutput};
+pub use ffprobe::{parse_ffmpeg_stderr_tags, probe_metadata, FfprobeFormat, FfprobeOutput};
 pub use metaflac::apply_flac_tags;

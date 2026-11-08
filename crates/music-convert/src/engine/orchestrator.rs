@@ -3,8 +3,8 @@ use crate::engine::task::{BatchTask, TaskStatus, TrackItem, TrackStatus};
 use chrono::Utc;
 use music_audio::{
     build_track_filename, convert_single_track, infer_single_track_metadata, parse_cue_file,
-    probe_metadata, resolve_album_output_dir, resolve_disc_output_dir, split_cue_track,
-    sync_missing_tracks, title_matches,
+    parse_disc_number_from_name, probe_metadata, resolve_album_output_dir, resolve_disc_output_dir,
+    split_cue_track, sync_missing_tracks, title_matches,
 };
 use music_core::{Config, Database, MusicFileInfo, ReleaseBatch, TrackMetadata};
 use music_provider::{MetadataQuery, ProviderChain};
@@ -409,6 +409,20 @@ impl ConvertOrchestrator {
             }
         }
 
+        // Calculate overall disc_total across all files in batch
+        let disc_total = unprocessed_files
+            .iter()
+            .map(|f| {
+                let p = f.file_path.as_ref().or(f.cue_path.as_ref());
+                p.and_then(|p| p.parent())
+                    .and_then(|p| p.file_name())
+                    .and_then(|s| s.to_str())
+                    .and_then(parse_disc_number_from_name)
+                    .unwrap_or(1)
+            })
+            .max()
+            .unwrap_or(1);
+
         // 3. Convert files
         for (idx, file) in unprocessed_files.iter().enumerate() {
             self.convert_file_item(
@@ -421,6 +435,7 @@ impl ConvertOrchestrator {
                 final_year.as_deref(),
                 &online_meta,
                 &mut present_tracks,
+                disc_total,
             )
             .await;
         }
@@ -481,8 +496,9 @@ impl ConvertOrchestrator {
         year: Option<&str>,
         online_meta: &Option<music_core::ReleaseMetadata>,
         present_tracks: &mut HashSet<u32>,
+        disc_total: u32,
     ) {
-        // Disc resolution: check if parent folder is CD1/CD2
+        // Disc resolution: check if parent folder is CD1/CD2/Disc 1/etc.
         let file_path = match item.file_path.as_ref().or(item.cue_path.as_ref()) {
             Some(p) => p,
             None => return,
@@ -493,13 +509,7 @@ impl ConvertOrchestrator {
             .and_then(|s| s.to_str())
             .unwrap_or("");
 
-        let disc_num = if parent_name.to_uppercase().starts_with("CD") {
-            parent_name[2..].parse::<u32>().unwrap_or(1)
-        } else {
-            1
-        };
-
-        let disc_total = 1;
+        let disc_num = parse_disc_number_from_name(parent_name).unwrap_or(1);
         let disc_out_dir = resolve_disc_output_dir(album_out_dir, disc_num, disc_total);
         let _ = fs::create_dir_all(&disc_out_dir);
 

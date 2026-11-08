@@ -32,9 +32,20 @@ where
     loop {
         match rx.recv() {
             Ok(Ok(events)) => {
-                let paths: Vec<PathBuf> =
-                    events.into_iter().map(|e: DebouncedEvent| e.path).collect();
-                on_change(paths);
+                let paths: Vec<PathBuf> = events
+                    .into_iter()
+                    .map(|e: DebouncedEvent| e.path)
+                    .filter(|p| {
+                        let s = p.to_string_lossy();
+                        !s.contains("@eaDir")
+                            && !s.contains("/.")
+                            && !s.ends_with('~')
+                            && !s.ends_with(".tmp")
+                    })
+                    .collect();
+                if !paths.is_empty() {
+                    on_change(paths);
+                }
             }
             Ok(Err(err)) => {
                 error!("[Watcher] Debounce error: {:?}", err);
